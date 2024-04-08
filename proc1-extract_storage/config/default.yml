@@ -1,0 +1,53 @@
+version: "20240407"
+
+attm_config:
+- document:
+    category: document
+    attm_path: "../proc0-crawl/attachments/document"
+    attm_info_path: "../proc0-crawl/vn_register_webportal/data/document.json"
+    force_close: 6
+    allow_merge: 6
+- rule-standard:
+    category: rule-standard
+    attm_path: "../proc0-crawl/attachments/rule-standard"
+    attm_info_path: "../proc0-crawl/vn_register_webportal/data/rule-standard.json"
+    force_close: 7
+    allow_merge: 8
+
+tokenizer: vinai/phobert-base-v2
+add_special_tokens: true
+hf_cache: "./hf_cache"
+
+max_tokens: 256 # max_tokens_per_chunk
+
+overlapse:
+- 0
+- 0.1
+- 0.3
+
+sent_separator: "<\\>"
+
+extensions:
+- pdf
+- docx
+- cv
+
+pdf_confidence_threshold: 50
+ocr_kwargs:
+  dpi: 350
+  margin:
+  - 200
+  - 200
+  - 150
+  - 50
+  config: "-l vie --psm 6"
+  im_size:
+  - 2550
+  - 3300
+  thread_count: 1
+
+out_dir: "./chunks-5/"
+checkpoint_dir: "./chunks-5/"
+
+num_worker: 4
+num_corrector: 2

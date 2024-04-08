@@ -1,0 +1,26 @@
+version: '2.25'
+services:
+  hf-llm_chatbot:
+    image: hf-llm-chatbot:latest
+    container_name: hf-llm-chatbot
+    ports:
+      - 9104:5002
+    volumes:
+      - /workspace/nlplab/kienvt/scada-llm-chatbot/:/app
+      - /workspace/nlplab/kienvt/KLTN/proc1-extract_storage/hf_cache/:/hf_cache
+      - /workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp:/vncorenlp
+    networks:
+      - scada
+    restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['all']
+            capabilities: [gpu]
+
+networks:
+  scada:
+    external: true

@@ -1,0 +1,6 @@
+./.locks
+./llmenv
+./models--*
+./__pycache__
+./Dockerfile
+./docker-compose.yml
