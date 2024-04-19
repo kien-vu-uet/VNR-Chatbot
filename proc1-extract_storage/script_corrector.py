@@ -7,8 +7,9 @@ import re
 # from underthesea import text_normalize
 import py_vncorenlp
 
-vncorenlp_segmentor = py_vncorenlp.VnCoreNLP(annotators=['wseg'], max_heap_size='-Xmx4g',
-                                save_dir='/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp')
+vncorenlp_segmentor = py_vncorenlp.VnCoreNLP(annotators=['wseg'], 
+                                            #  max_heap_size='-Xmx4g',
+                                             save_dir='/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp')
 corrector = pipeline("text2text-generation", model="bmd1905/vietnamese-correction", device=0, max_new_tokens=512)
 # tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 app = Flask(__name__)
@@ -26,7 +27,7 @@ class MyDataset(Dataset):
             _doc = vncorenlp_segmentor.word_segment(_doc)
             # _doc = [d for d in _doc.split('.') if len(d.strip()) > 0]
             while i + 1 < len(_doc):
-                _doc[i] = _doc[i].strip()
+                _doc[i] = _doc[i].strip().replace('_', ' ')
                 if 0 < len(_doc[i]) <= 7: 
                     _doc[i+1] = f'{_doc[i]} {_doc[i+1].strip()}'
                     _doc.pop(i)

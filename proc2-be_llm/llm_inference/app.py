@@ -72,8 +72,8 @@ if torch.cuda.is_available():
     # model_id = "vilm/vinallama-7b-chat"
     # model_id = "LR-AI-Labs/vbd-llama2-7B-50b-chat"
     model_id = "Viet-Mistral/Vistral-7B-Chat"
-    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto", cache_dir='./')
-    tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir='./')
+    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto", cache_dir='/hf_cache')
+    tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir='/hf_cache')
     tokenizer.use_default_system_prompt = False
 
 

@@ -1,0 +1,45 @@
+
+seed: 42
+
+datasets:
+  IR:
+    data_path: "./data/segment/train_IR_segment.json"
+    train_path: "./data/train_test_split/train_IR_segment-train.json"
+    test_path: "./data/train_test_split/train_IR_segment-test.json"
+    data_module: "IRSegmentDataset"
+    test_size: 0.05
+
+tokenizer: "vinai/phobert-base-v2"
+hf_cache: "/workspace/nlplab/kienvt/KLTN/proc1-extract_storage/hf_cache"
+max_length: 515
+
+pretrained_path: null
+load_state_dict_option: 'encoder_only'
+model:
+  model_type: "Roberta"
+  hidden_size: 768
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 3072
+  hidden_act: "gelu"
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 515
+  position_embedding_type: "absolute"
+  type_vocab_size: 2
+  layer_norm_eps: 0.00001
+  initializer_range: 0.02
+  classifier_dropout: 0.1
+  num_labels: 2
+  problem_type: 'single_label_classification'
+
+max_epochs: 10
+batch_size: 4
+shuffle_train: true
+shuffle_test: false
+device: "cuda"
+optimizer: "Adam"
+lr: 0.00005
+model_checkpoints: "./model_checkpoints/IR/"
+train_from_last_epoch: true
+
