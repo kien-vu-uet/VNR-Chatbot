@@ -1,7 +1,7 @@
 RobertaModel(
   (embeddings): RobertaEmbeddings(
     (word_embeddings): Embedding(64001, 768, padding_idx=1)
-    (position_embeddings): Embedding(258, 768, padding_idx=1)
+    (position_embeddings): Embedding(515, 768, padding_idx=1)
     (token_type_embeddings): Embedding(1, 768)
     (LayerNorm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
     (dropout): Dropout(p=0.1, inplace=False)
