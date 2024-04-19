@@ -46,8 +46,12 @@ ocr_kwargs:
   - 3300
   thread_count: 1
 
-out_dir: "./chunks-5/"
-checkpoint_dir: "./chunks-5/"
+out_dir: "./chunks-6/"
+checkpoint_dir: "./chunks-6/"
 
 num_worker: 4
+
 num_corrector: 2
+corrector_ports:
+- 9399
+- 9398

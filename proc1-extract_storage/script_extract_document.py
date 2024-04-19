@@ -10,7 +10,7 @@ import requests
 from datetime import datetime
 
 # %%
-MAGIC_PORT = 9299
+# MAGIC_PORT = 9399
 
 # %%
 def get_tag(content:str):
@@ -584,17 +584,6 @@ def main(opt:Dict[str, str], global_opt:Dict[str, str]):
 # %%
 import multiprocessing as mpc
 
-#%%
-import subprocess
-def wakeup_corrector(port):
-    # flask --app script_corrector.py run --host=0.0.0.0 --port=9298
-    return subprocess.call(
-        args=["flask", "--app script_corrector.py", "run", "--host=0.0.0.0", f"--port={port}"],
-        env={"PATH":"../kenv/bin/"},
-        # stderr=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-    )
-
 # %%
 def get_curr_timestamp() -> str:
     current_time = current_time = datetime.now()
@@ -659,6 +648,8 @@ def extract_layout_multiprocess(inputs:mpc.Queue, out_dir:str, index:int, closed
                 del post_docs
                 print(f'{get_curr_timestamp()} PROCESS {index} | Save to {f.name}!')
                 f.close()
+            del head_list
+            del doc_list
                 
         except Exception as e: 
             error_path = os.path.join(out_dir, 'error')
@@ -718,11 +709,24 @@ def calculate_time(input:mpc.Value, num_proc:int, queue:mpc.Queue, step=10):
     qsize = queue.qsize()
     while input.value < num_proc:# or queue.qsize() != qsize:
         execute_time = time.time()-start
-        print(f"""{get_curr_timestamp()} GLOBAL    | Execute time: {int(execute_time // 3600):2d}:{int(execute_time // 60):2d}:{int(execute_time % 60):2d}; """ \
+        hh = execute_time // 3600
+        mm = (execute_time % 3600) // 60
+        ss = (execute_time % 3600) % 60
+        print(f"""{get_curr_timestamp()} GLOBAL    | Execute time: {int(hh):02d}h-{int(mm):02d}m-{int(ss):02d}s; """ \
               f"""Progress: {qsize - queue.qsize()}/{qsize} ({100 - queue.qsize() * 100 // qsize}%)""")
         time.sleep(step)
     print(f"{get_curr_timestamp()} GLOBAL | STOP!!!")
         
+#%%
+import subprocess
+def wakeup_corrector(host:str, port:int):
+    # flask --app script_corrector.py run --host=0.0.0.0 --port=9298
+    return subprocess.call(
+        args=["flask", "--app=script_corrector.py", "run", f"--host={host}", f"--port={port}"],
+        # env={"PATH": "/workspace/nlplab/kienvt/KLTN/kenv/bin"}, # /workspace/nlplab/kienvt/KLTN/kenv/bin
+        # stderr=subprocess.DEVNULL,
+        stdout=None,
+    )
 #%%
 
 #%%
@@ -778,7 +782,7 @@ if __name__ == "__main__":
     
     NUM_POST_PROCESSOR = args.num_worker
     global MAGIC_PORTS
-    MAGIC_PORTS = list(range(MAGIC_PORT+1 - args.num_corrector, MAGIC_PORT+1))
+    MAGIC_PORTS = args.corrector_ports # list(range(MAGIC_PORT+1 - args.num_corrector, MAGIC_PORT+1))
     
     fp_queue = mpc.Queue()
     
@@ -797,7 +801,9 @@ if __name__ == "__main__":
         
     correctors = []
     for i in range(args.num_corrector):
-        corrector = mpc.Process(target=wakeup_corrector, args=(MAGIC_PORTS[i]))
+        corrector = mpc.Process(target=wakeup_corrector, 
+                                args=("0.0.0.0", MAGIC_PORTS[i]), 
+                                daemon=True)
         correctors.append(corrector)
         corrector.start()
     
@@ -813,19 +819,27 @@ if __name__ == "__main__":
     processors = []
     closed_processors = mpc.Value('d', 0)
     for i in range(NUM_POST_PROCESSOR):
-        processor = mpc.Process(target=extract_layout_multiprocess, args=(fp_queue, args.out_dir, i, closed_processors))
+        processor = mpc.Process(target=extract_layout_multiprocess, 
+                                args=(fp_queue, args.out_dir, i, closed_processors), 
+                                daemon=True)
         processors.append(processor)
         processor.start()
     
-    global_processors = mpc.Process(target=calculate_time, args=(closed_processors, NUM_POST_PROCESSOR, fp_queue, 300))
-    global_processors.start()
+    global_processor = mpc.Process(target=calculate_time, 
+                                    args=(closed_processors, NUM_POST_PROCESSOR, fp_queue, 300), 
+                                    daemon=True)
+    global_processor.start()
     
     while True:
         if closed_processors.value == NUM_POST_PROCESSOR:
+            global_processor.join(timeout=1.0)
+            del global_processor
             for processor in processors:
-                processor.terminate()
+                processor.join(timeout=1.0)
+                del processor
             for corrector in correctors:
-                corrector.terminate()
-            global_processors.terminate()
+                corrector.join(timeout=1.0)  
+                del corrector
+                # if not corrector.is_alive(): corrector.join(timeout=1.0)           
             fp_queue.close()
             break
