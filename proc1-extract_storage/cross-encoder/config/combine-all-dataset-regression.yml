@@ -3,41 +3,58 @@ seed: 42
 
 datasets:
   ViNLI-Zalo-supervised:
-    data_path: "./data/segment/ViNLI-Zalo-supervised.json"
-    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-train.json"
-    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-test.json"
-    data_module: "ViNLIZaloDataset"
-    test_size: 0.1
+    data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
+    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-no-segment-train.json"
+    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-no-segment-test.json"
+    data_module: "ViNLIZaloRegressionDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
+    
+  ViNLI-SimCSE-supervised:
+    data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
+    train_path: "./data/train_test_split/ViNLI-SimCSE-supervised-no-segment-train.json"
+    test_path: "./data/train_test_split/ViNLI-SimCSE-supervised-no-segment-test.json"
+    data_module: "ViNLIZaloRegressionDataset"
+    test_size: 0.15
+    reverse_input: true
+    force_remake: false
 
   ViSTS:
-    data_path: "./data/segment/ViSTS-segment.json"
-    train_path: "./data/train_test_split/ViSTS-segment-train.json"
-    test_path: "./data/train_test_split/ViSTS-segment-test.json"
-    data_module: "ViSTSDataset"
-    test_size: 0.1
+    data_path: "./data/no_segment/ViSTS.json"
+    train_path: "./data/train_test_split/ViSTS-no-segment-train.json"
+    test_path: "./data/train_test_split/ViSTS-no-segment-test.json"
+    data_module: "ViSTSRegressionDataset"
+    test_size: 0.15
+    reverse_input: true
+    force_remake: false
 
   IR:
-    data_path: "./data/segment/train_IR_segment.json"
-    train_path: "./data/train_test_split/train_IR_segment-train.json"
-    test_path: "./data/train_test_split/train_IR_segment-test.json"
-    data_module: "IRSegmentDataset"
-    test_size: 0.1
+    data_path: "./data/no_segment/train-IR.json"
+    train_path: "./data/train_test_split/train-IR-no-segment-train.json"
+    test_path: "./data/train_test_split/train-IR-no-segment-test.json"
+    data_module: "IRSegmentRegressionDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
 
   ViMMRC:
-    data_path: "./data/segment/ViMMRC_segment.json"
-    train_path: "./data/train_test_split/ViMMRC_segment-train.json"
-    test_path: "./data/train_test_split/ViMMRC_segment-test.json"
-    data_module: "ViMMRCSegmentDataset"
-    test_size: 0.1
+    data_path: "./data/no_segment/ViMMRC.json"
+    train_path: "./data/train_test_split/ViMMRC-no-segment-train.json"
+    test_path: "./data/train_test_split/ViMMRC-no-segment-test.json"
+    data_module: "ViMMRCSegmentRegressionDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
 
-tokenizer: "vinai/phobert-base-v2"
+tokenizer: "chieunq/XLM-R-base-finetuned-uit-vquad-1"
 hf_cache: "../hf_cache"
-max_length: 515
+max_length: 514
 
 pretrained_path: null
 load_state_dict_option: 'encoder_only'
 model:
-  model_type: "Roberta"
+  model_type: "XLMRoberta"
   hidden_size: 768
   num_hidden_layers: 12
   num_attention_heads: 12
@@ -45,23 +62,32 @@ model:
   hidden_act: "gelu"
   hidden_dropout_prob: 0.1
   attention_probs_dropout_prob: 0.1
-  max_position_embeddings: 515
+  max_position_embeddings: 514
   position_embedding_type: "absolute"
-  type_vocab_size: 2
-  layer_norm_eps: 0.000001
+  torch_dtype: "float32"
+  type_vocab_size: 1
+  layer_norm_eps: 0.00001
   initializer_range: 0.02
   classifier_dropout: 0.1
   num_labels: 1
-  problem_type: "regression"
+  problem_type: 'regression'
 
-max_epochs: 300
-batch_size: 16
+max_epochs: 30
+batch_size: 4
+
+input_fields:
+- input_ids
+- attention_mask
+# - token_type_ids
+- position_ids
+- labels
+
 shuffle_train: true
 shuffle_test: false
 num_workers: 1
 device: 0
 optimizer: "AdamW"
 lr: 0.0005
-model_checkpoints: "./model_checkpoints/regressor/"
+model_checkpoints: "./model_checkpoints/xlmclassifier/"
 train_from_last_epoch: true
 

@@ -2,11 +2,11 @@
 seed: 42
 
 datasets:
-  ViNLI-Zalo:
-    data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
-    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-train.json"
-    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-test.json"
-    data_module: "ViNLIZaloDataset"
+  IR:
+    data_path: "./data/no_segment/train-IR.json"
+    train_path: "./data/train_test_split/train-IR-no-segment-train.json"
+    test_path: "./data/train_test_split/train-IR-no-segment-test.json"
+    data_module: "IRSegmentDataset"
     test_size: 0.3
     reverse_input: false
     force_remake: false
@@ -54,4 +54,3 @@ optimizer: "AdamW"
 lr: 0.0005
 model_checkpoints: "./model_checkpoints/xlmclassifier/"
 train_from_last_epoch: true
-

@@ -20,15 +20,6 @@ datasets:
     reverse_input: true
     force_remake: false
 
-  ViSTS:
-    data_path: "./data/no_segment/ViSTS.json"
-    train_path: "./data/train_test_split/ViSTS-no-segment-train.json"
-    test_path: "./data/train_test_split/ViSTS-no-segment-test.json"
-    data_module: "ViSTSDataset"
-    test_size: 0.15
-    reverse_input: true
-    force_remake: false
-
   IR:
     data_path: "./data/no_segment/train-IR.json"
     train_path: "./data/train_test_split/train-IR-no-segment-train.json"
@@ -47,14 +38,32 @@ datasets:
     reverse_input: false
     force_remake: false
 
-tokenizer: "chieunq/XLM-R-base-finetuned-uit-vquad-1"
-hf_cache: "../hf_cache"
-max_length: 514
+  UIT-ViQuAD:
+    data_path: "./data/no_segment/UIT-ViQuAD.json"
+    train_path: "./data/train_test_split/UIT-ViQuAD-no-segment-train.json"
+    test_path: "./data/train_test_split/UIT-ViQuAD-no-segment-test.json"
+    data_module: "ViMMRCSegmentDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
 
-pretrained_path: null
-load_state_dict_option: 'encoder_only'
+  SQuAD-Vi:
+    data_path: "./data/no_segment/SQuAD-Vi.json"
+    train_path: "./data/train_test_split/SQuAD-Vi-no-segment-train.json"
+    test_path: "./data/train_test_split/SQuAD-Vi-no-segment-test.json"
+    data_module: "ViMMRCSegmentDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
+
+tokenizer: "amberoad/bert-multilingual-passage-reranking-msmarco"
+hf_cache: "../hf_cache"
+max_length: 512
+
+pretrained_path: "./model_checkpoints/bertmultilingual/amberoad--bert-multilingual-passage-reranking-msmarco.pt"
+load_state_dict_option: 'force_load'
 model:
-  model_type: "XLMRoberta"
+  model_type: "Bert"
   hidden_size: 768
   num_hidden_layers: 12
   num_attention_heads: 12
@@ -62,24 +71,33 @@ model:
   hidden_act: "gelu"
   hidden_dropout_prob: 0.1
   attention_probs_dropout_prob: 0.1
-  max_position_embeddings: 514
+  max_position_embeddings: 512
   position_embedding_type: "absolute"
   torch_dtype: "float32"
-  type_vocab_size: 1
-  layer_norm_eps: 0.00001
+  type_vocab_size: 2
+  layer_norm_eps: 0.000000000001
   initializer_range: 0.02
-  classifier_dropout: 0.1
+  pooler_fc_size: 768
+  pooler_num_attention_heads: 12
+  pooler_num_fc_layers: 3
+  pooler_size_per_head: 128
+  pooler_type: "first_token_transform"
+  classifier_dropout: null
   num_labels: 2
-  problem_type: 'single_label_classification'
+  id2label:
+    0: LABEL_0
+    1: LABEL_1
+  use_cache: true
+  problem_type: null
 
-max_epochs: 30
+max_epochs: 100
 batch_size: 16
 
 input_fields:
 - input_ids
 - attention_mask
-# - token_type_ids
-- position_ids
+- token_type_ids
+# - position_ids
 - labels
 
 shuffle_train: true
@@ -87,7 +105,7 @@ shuffle_test: false
 num_workers: 1
 device: 0
 optimizer: "AdamW"
-lr: 0.0005
-model_checkpoints: "./model_checkpoints/xlmclassifier/"
+lr: 0.00005
+model_checkpoints: "./model_checkpoints/bertclassifier-finetune/"
 train_from_last_epoch: true
 

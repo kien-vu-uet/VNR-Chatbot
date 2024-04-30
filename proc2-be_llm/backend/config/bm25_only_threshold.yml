@@ -1,0 +1,36 @@
+
+hf_token: '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'
+cache_dir: "../proc1-extract_storage/hf_cache"
+device: "cpu"
+
+weights: 
+  es_bm25: 1.0
+  es_cosine_sbert: 0.
+  rerank: 0.
+
+ranking_strategy:
+  name: 'Threshold'
+  params:
+    confidence_threshold: 0.15
+    ambiguity_threshold: 0.05
+
+elastic_search:
+  host: "http://192.168.32.1:9200"
+  token: 'Ylh4SkRJOEJTcEJhOGhwYlY4TFo6R0p3NUJ6SHFUVTZJd01FSm56RTRtdw=='
+  index: "vnr-overlapse00-vnbiencoder"
+  query_strategy: "ensemble"
+  query_type: "should"
+  activate_fn: "sigmoid"
+  scale: 1
+  offset: 0.5
+  knn_topk: 20
+  knn_num_candidates: 100
+
+encoder:
+  encoder_name_or_path: 'bkai-foundation-models/vietnamese-bi-encoder'
+  vncorenlp_path: "/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp"
+  max_heap_size: '-Xmx4g'
+
+rerank_model:
+  model_name_or_path: 'kien-vu-uet/finetuned-bert-multilingual-passage-reranking-msmarco'
+  max_length: 512

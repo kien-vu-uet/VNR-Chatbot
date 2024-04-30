@@ -7,9 +7,11 @@ __pycache__
 models--*
 proc0-crawl/attachments
 proc0-crawl/vn_register_webportal/data
+
 proc1-extract_storage/chunks*
 proc1-extract_storage/docker-elk
 proc1-extract_storage/hf_cache
+proc1-extract_storage/vncorenlp
 proc1-extract_storage/docx_extract.ipynb
 proc1-extract_storage/script_extract_docx.ipynb
 proc1-extract_storage/script_ocr.ipynb
@@ -18,3 +20,12 @@ proc1-extract_storage/cross-encoder/data/*
 proc1-extract_storage/cross-encoder/model_checkpoints/*
 proc1-extract_storage/cross-encoder/script_training.ipynb
 proc1-extract_storage/cross-encoder/script_training.py
+proc1-extract_storage/cross-encoder/phobert.txt
+proc1-extract_storage/cross-encoder/training_logs.txt
+proc1-extract_storage/cross-encoder/tmp.ipynb
+
+proc2-be_llm/backend/tmp.ipynb
+proc2-be_llm/backend/logs.json
+proc2-be_llm/backend/flagged
+proc2-be_llm/backend/gradio_cached_examples
+

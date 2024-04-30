@@ -1,0 +1,67 @@
+
+seed: 42
+
+datasets:
+  NLI-data:
+    data_path: "/workspace/nlplab/nmq/KLTN/training_model/data/clean_data/ViNLI_segment_vncore_nlp.csv"
+    train_path: "/workspace/nlplab/nmq/KLTN/training_model/data/clean_data/ViNLI_segment_vncore_nlp_train.json"
+    test_path: "/workspace/nlplab/nmq/KLTN/training_model/data/clean_data/ViNLI_segment_vncore_nlp_test.json"
+    data_module: "BasicNLIDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
+
+tokenizer: "vinai/phobert-base-v2"
+hf_cache: "../hf_cache"
+max_length: 258
+
+pretrained_path: "./model_checkpoints/phobert-4Quy/epoch_0.pt"
+load_state_dict_option: 'force_load'
+model:
+  model_type: "Roberta"
+  hidden_size: 768
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 3072
+  hidden_act: "gelu"
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 258
+  position_embedding_type: "absolute"
+  torch_dtype: "float32"
+  type_vocab_size: 1
+  layer_norm_eps: 0.00001
+  initializer_range: 0.02
+  pooler_fc_size: 768
+  pooler_num_attention_heads: 12
+  pooler_num_fc_layers: 3
+  pooler_size_per_head: 128
+  pooler_type: "first_token_transform"
+  classifier_dropout: null
+  num_labels: 2
+  id2label:
+    0: NEG
+    1: POS
+  use_cache: true
+  problem_type: "single_label_classification"
+
+do_train: false
+max_epochs: 50
+batch_size: 32
+
+input_fields:
+- input_ids
+- attention_mask
+# - token_type_ids
+- position_ids
+- labels
+
+shuffle_train: true
+shuffle_test: false
+num_workers: 1
+device: 0
+optimizer: "AdamW"
+lr: 0.00005
+model_checkpoints: "./model_checkpoints/phobert-4Quy"
+train_from_last_epoch: true
+

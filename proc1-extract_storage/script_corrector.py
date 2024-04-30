@@ -6,11 +6,13 @@ import torch
 import re
 # from underthesea import text_normalize
 import py_vncorenlp
+from typing import List
+import requests
 
-vncorenlp_segmentor = py_vncorenlp.VnCoreNLP(annotators=['wseg'], 
-                                            #  max_heap_size='-Xmx4g',
-                                             save_dir='/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp')
-corrector = pipeline("text2text-generation", model="bmd1905/vietnamese-correction", device=0, max_new_tokens=512)
+# vncorenlp_segmentor = py_vncorenlp.VnCoreNLP(annotators=['wseg'], 
+#                                             #  max_heap_size='-Xmx4g',
+#                                              save_dir='/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp')
+corrector = pipeline("text2text-generation", model="bmd1905/vietnamese-correction-v2", device=0, max_new_tokens=512)
 # tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 app = Flask(__name__)
 BSZ = 8
@@ -18,16 +20,18 @@ BSZ = 8
 # OVERLAPSE = 0.5
 
 class MyDataset(Dataset):
-    def __init__(self, document): 
+    def __init__(self, document: List[str]): 
         self._document = []
         for doc in document:
             _doc = re.sub(r'\.(\s)?\.', '.', doc)
             i = 0
-            _doc = _doc.replace('\t', '. ').replace('\n', '. ')
-            _doc = vncorenlp_segmentor.word_segment(_doc)
+            _doc = _doc.replace('\t', ' ').replace('\n', ' ')
+            response = requests.post(url='http://localhost:9091/segment2', 
+                                 json={'text': _doc, 'sent_separator': "<\\>"})
+            _doc = response.json().get('sent').split("<\\>")
             # _doc = [d for d in _doc.split('.') if len(d.strip()) > 0]
             while i + 1 < len(_doc):
-                _doc[i] = _doc[i].strip().replace('_', ' ')
+                _doc[i] = _doc[i].strip()
                 if 0 < len(_doc[i]) <= 7: 
                     _doc[i+1] = f'{_doc[i]} {_doc[i+1].strip()}'
                     _doc.pop(i)

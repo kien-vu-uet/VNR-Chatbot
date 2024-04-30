@@ -1,14 +1,14 @@
 
 seed: 42
 
-datasets:
-  ViNLI-Zalo:
-    data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
-    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-train.json"
-    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-test.json"
-    data_module: "ViNLIZaloDataset"
+datasets:  
+  ViSTS:
+    data_path: "./data/no_segment/ViSTS.json"
+    train_path: "./data/train_test_split/ViSTS-no-segment-train.json"
+    test_path: "./data/train_test_split/ViSTS-no-segment-test.json"
+    data_module: "ViSTSDataset"
     test_size: 0.3
-    reverse_input: false
+    reverse_input: true
     force_remake: false
 
 tokenizer: "chieunq/XLM-R-base-finetuned-uit-vquad-1"
@@ -36,7 +36,7 @@ model:
   num_labels: 2
   problem_type: 'single_label_classification'
 
-max_epochs: 10
+max_epochs: 30
 batch_size: 4
 
 input_fields:
@@ -54,4 +54,3 @@ optimizer: "AdamW"
 lr: 0.0005
 model_checkpoints: "./model_checkpoints/xlmclassifier/"
 train_from_last_epoch: true
-

@@ -15,7 +15,7 @@ attm_config:
     allow_merge: 8
 
 tokenizer: vinai/phobert-base-v2
-add_special_tokens: true
+add_special_tokens: false
 hf_cache: "./hf_cache"
 
 max_tokens: 256 # max_tokens_per_chunk
@@ -46,8 +46,8 @@ ocr_kwargs:
   - 3300
   thread_count: 1
 
-out_dir: "./chunks-6/"
-checkpoint_dir: "./chunks-6/"
+out_dir: "./chunks-7/"
+checkpoint_dir: "./chunks-7/"
 
 num_worker: 4
 

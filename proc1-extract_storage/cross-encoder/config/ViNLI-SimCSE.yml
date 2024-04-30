@@ -2,13 +2,13 @@
 seed: 42
 
 datasets:
-  ViNLI-Zalo:
+  ViNLI-SimCSE:
     data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
-    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-train.json"
-    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-test.json"
+    train_path: "./data/train_test_split/ViNLI-SimCSE-supervised-no-segment-train.json"
+    test_path: "./data/train_test_split/ViNLI-SimCSE-supervised-no-segment-test.json"
     data_module: "ViNLIZaloDataset"
     test_size: 0.3
-    reverse_input: false
+    reverse_input: true
     force_remake: false
 
 tokenizer: "chieunq/XLM-R-base-finetuned-uit-vquad-1"
@@ -54,4 +54,3 @@ optimizer: "AdamW"
 lr: 0.0005
 model_checkpoints: "./model_checkpoints/xlmclassifier/"
 train_from_last_epoch: true
-

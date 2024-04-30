@@ -148,6 +148,7 @@ def extract_docx_layout(document_,
             # print(pos_h, pos_d, len(doc_stack), tag)
             while len(doc_stack) > 0 <= pos_h and doc_stack[pos_h] >= tag:
                 _doc = doc_item.pop(-1)
+                doc_list[-1] = _doc + sent_separator + doc_list[-1]
                 _tag = doc_stack.pop(-1)
                 pos_h -= 1
                 # print(pos_h, pos_d, len(doc_stack), tag)
@@ -419,31 +420,41 @@ def post_process(head_list:List[str],
            sent_separator='<\>') -> Tuple[List[str], List[str]]:
     
     assert len(head_list) == len(doc_list), f'Got unexpected document\'s layout!'
-    _doc_list = [d.replace(sent_separator, ' ') for d in doc_list]
+    doc_list_segment = []
+    for _doc in doc_list:
+        response = requests.post(url='http://localhost:9091/segment2', 
+                                 json={'text': _doc.replace(sent_separator, ' '), 'sent_separator': sent_separator})
+        doc_list_segment.append(response.json().get('sent'))
     tokens_count = [len(tl) \
-        for tl in tokenizer(_doc_list, add_special_tokens=add_special_tokens).input_ids]
+        for tl in tokenizer([d.replace(sent_separator, ' ') for d in doc_list_segment], 
+                            add_special_tokens=add_special_tokens).input_ids]
     # print(tokens_count)
     i = 0
     while i+1 < len(head_list):
-        _head = head_list[i]
-        if tokens_count[i] + tokens_count[i+1] < max_tokens:
+        _head = head_list[i].strip()
+        if tokens_count[i] + tokens_count[i+1] < max_tokens and _head == head_list[i+1].strip():
             _merge_head = head_list.pop(i+1)
-            _merge_doc = doc_list.pop(i+1)
+            _merge_doc = doc_list_segment.pop(i+1)
             _merge_count = tokens_count.pop(i+1)
-            if _merge_head.strip() != _head.strip() and _merge_head.strip() != '':
-                _merge_head = sent_separator.join([h for h in _merge_head.split(sent_separator) if h not in _head.strip().split(sent_separator)])
-                head_list[i] += sent_separator + 'Và' + sent_separator + _merge_head
+            # if _merge_head.strip() != _head.strip() and _merge_head.strip() != '':
+            #     _merge_head = sent_separator.join([
+            #                 h for h in _merge_head.split(sent_separator) \
+            #                     if h not in _head.strip().split(sent_separator) \
+            #                             and h.strip().__len__() > 0
+            #                                 ])
+                # head_list[i] += sent_separator + 'Và' + sent_separator + _merge_head
+                # head_list[i] += sent_separator + _merge_head
             tokens_count[i] += _merge_count
-            doc_list[i] += sent_separator + _merge_doc
+            doc_list_segment[i] += sent_separator + _merge_doc
         else:
             i += 1 
     #end-while
         
-    assert len(head_list) == len(doc_list), f'Got unexpected document\'s layout!'
+    assert len(head_list) == len(doc_list_segment), f'Got unexpected document\'s layout!'
     
     result_head = []
     result_doc = []
-    for _head, _doc, _count in zip(head_list, doc_list, tokens_count):
+    for _head, _doc, _count in zip(head_list, doc_list_segment, tokens_count):
         if _count > max_tokens:
             chunks = truncate(_doc, tokenizer, add_special_tokens, max_tokens, overlapse, sent_separator)
             for chunk in chunks:
@@ -634,14 +645,17 @@ def extract_layout_multiprocess(inputs:mpc.Queue, out_dir:str, index:int, closed
                                                             max_tokens=global_opt["max_tokens"],
                                                             overlapse=overlapse,
                                                             sent_separator=global_opt["sent_separator"])
-                save_dir = os.path.join(out_dir, f'overlapse_{int(overlapse * 100)}')
+                save_dir = os.path.join(out_dir, f'overlapse_{int(overlapse * 100):2d}')
                 if not os.path.exists(save_dir):
                     os.mkdir(save_dir)
                 print(f'{get_curr_timestamp()} PROCESS {index} | Post-processed got {len(post_headers)} chunks!')
                 f = open(os.path.join(save_dir, f'proc-{index}.txt'), 'a')
+                chunk_index = 0
                 for _head, _doc in zip(post_headers, post_docs):
                     form["header"] = clean_data(_head.replace(global_opt["sent_separator"], ' '))
-                    form["content"] = _doc.replace(global_opt["sent_separator"], ' ')
+                    form["content"] = _doc.replace(global_opt["sent_separator"], ' ').replace('_', ' ')
+                    form["chunk_index"] = chunk_index
+                    chunk_index += 1
                     # chunks.append(form)
                     print(json.dumps(form, ensure_ascii=False), file=f, end='\n')
                 del post_headers
@@ -707,7 +721,7 @@ import time
 def calculate_time(input:mpc.Value, num_proc:int, queue:mpc.Queue, step=10):
     start = time.time()
     qsize = queue.qsize()
-    while input.value < num_proc:# or queue.qsize() != qsize:
+    while input.value < num_proc and queue.qsize() > 0:
         execute_time = time.time()-start
         hh = execute_time // 3600
         mm = (execute_time % 3600) // 60
@@ -812,6 +826,7 @@ if __name__ == "__main__":
             for port in MAGIC_PORTS:
                 response = requests.get(url=f'http://localhost:{port}/health')
                 if response.status_code == 200: pass
+                else: raise Exception("Error")
             break
         except:
             pass
