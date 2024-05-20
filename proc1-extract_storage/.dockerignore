@@ -1,0 +1,8 @@
+__pycache__
+chunks*
+config
+cross-encoder
+docker-elk
+hf_cache
+vncorenlp
+*.ipynb

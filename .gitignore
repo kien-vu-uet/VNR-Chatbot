@@ -2,11 +2,17 @@ crawlab
 crawlee-web-crawler
 crawler-scrapy-projects
 kenv
+peft
+bitsandbytes
+llama.cpp*
 __pycache__
 .locks
+tmp.ipynb
 models--*
+Vistral-7B-Chat-gguf
 proc0-crawl/attachments
 proc0-crawl/vn_register_webportal/data
+proc0-crawl/cv
 
 proc1-extract_storage/chunks*
 proc1-extract_storage/docker-elk
@@ -26,6 +32,15 @@ proc1-extract_storage/cross-encoder/tmp.ipynb
 
 proc2-be_llm/backend/tmp.ipynb
 proc2-be_llm/backend/logs.json
-proc2-be_llm/backend/flagged
-proc2-be_llm/backend/gradio_cached_examples
-
+proc2-be_llm/llm_inference/peft_model/*
+proc2-be_llm/llm_inference/peft_model_tllama/*
+proc2-be_llm/llm_inference/quantize_model
+proc2-be_llm/llm_inference/vistral-chatml
+proc2-be_llm/llm_inference/vistral_original
+proc2-be_llm/llm_inference/orig_model
+proc2-be_llm/llm_inference/tensorrtllm_backend
+proc2-be_llm/llm_inference/tensorrt_llm
+proc2-be_llm/llm_inference/*.txt
+proc2-be_llm/backend/doc2query
+flagged
+gradio_cached_examples

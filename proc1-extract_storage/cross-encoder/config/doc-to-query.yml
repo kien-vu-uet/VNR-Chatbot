@@ -1,0 +1,38 @@
+
+seed: 42
+
+datasets:  
+  qa-advise-source:
+    data_path: "./data/no_segment/qa-advise-source-pos-only.json"
+    train_path: "./data/train_test_split/qa-advise-source-pos-only-train.json"
+    test_path: "./data/train_test_split/qa-advise-source-pos-only-test.json"
+    data_module: "PairDataset"
+    test_size: 0.3
+    reverse_input: true
+    force_remake: false
+
+hf_cache: "../hf_cache"
+max_length: 512
+
+pretrained_path: 'doc2query/msmarco-vietnamese-mt5-base-v1'
+model:
+  problem_type: 'sequence_to_sequence'
+
+input_fields:
+- input_ids
+- attention_mask
+# - token_type_ids
+# - position_ids
+- labels
+
+max_epochs: 30
+batch_size: 128
+
+shuffle_train: true
+shuffle_test: false
+num_workers: 1
+device: "cuda"
+optimizer: "AdamW"
+lr: 0.0005
+model_checkpoints: "./model_checkpoints/doc2query-finetuned/"
+train_from_last_epoch: true

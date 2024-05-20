@@ -1,39 +1,48 @@
-hf_token: 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
-cache_dir: /workspace/nlplab/kienvt/KLTN/proc1-extract_storage/hf_cache/
-device: cpu
-weights:
-  bm25: 1.1
-  knn: 1.0
-  rerank: 1.0
-ranking_strategy:
-  name: TopK
+expand_pool:
+  name: D2QE
+  expand_first: true
   params:
-    topk: 20
-    relative: true
+    same_header: false
+    num_steps: 1
+    model_name_or_path: kien-vu-uet/doc2query-msmarco-vietnamese-mt5-base-v1-finetuned
+    llm_api: http://llm-inference-platform-cuda:8080/completion
+    generate_kwargs:
+      max_length: 128
+      do_sample: true
+      top_p: 0.9
+      top_k: 10
+rerank_model:
+  num_workers: 1
+  batch_size: 8
+  max_length: 512
+  model_name_or_path: kien-vu-uet/finetuned-bert-multilingual-passage-reranking-msmarco
+encoder:
+  segment_api:
+    output_field: sent
+    input_field: text
+    host: http://192.168.16.4:9091/pyvi
+  encoder_name_or_path: minhquy1624/NLI_xnli2_STS
 elastic_search:
-  host: http://192.168.32.1:9200
-  token: Ylh4SkRJOEJTcEJhOGhwYlY4TFo6R0p3NUJ6SHFUVTZJd01FSm56RTRtdw==
-  index: vnr-overlapse00-bkai-biencoder
-  query_strategy: ensemble
-  query_type: should
-  activate_fn: sigmoid
+  knn_num_candidates: 100
+  knn_topk: 50
   scale: 1
   offset: 0.5
-  knn_topk: 20
-  knn_num_candidates: 100
-encoder:
-  encoder_name_or_path: bkai-foundation-models/vietnamese-bi-encoder
-  vncorenlp_api:
-    host: http://192.168.32.1:9091/segment2
-    input_field: text
-    output_field: sent
-rerank_model:
-  model_name_or_path: kien-vu-uet/finetuned-bert-multilingual-passage-reranking-msmarco
-  max_length: 512
-  batch_size: 8
-  num_workers: 0
-  apply_rerank_softmax: true
-expand_pool:
-  num_steps: 2
-  same_header: false
-  expand_first: false
+  activate_fn: sigmoid
+  query_type: should
+  query_strategy: ensemble
+  index: vnr-overlapse10-finetuned-biencoder-v2-segment
+  token: Ylh4SkRJOEJTcEJhOGhwYlY4TFo6R0p3NUJ6SHFUVTZJd01FSm56RTRtdw==
+  host: http://192.168.192.1:9200
+ranking_strategy:
+  params:
+    relative: true
+    topk: 50
+  name: TopK
+max_pool_size: 10
+weights:
+  rerank: 1.0
+  knn: 1.0
+  bm25: 1.5
+device: cuda
+cache_dir: /hf_cache
+hf_token: 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

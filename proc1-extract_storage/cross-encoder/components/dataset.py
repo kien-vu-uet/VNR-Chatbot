@@ -2,7 +2,11 @@ from torch.utils.data import Dataset
 import json, csv
 from transformers import AutoTokenizer
 import os
+import numpy as np
 os.environ['TRANSFORMERS_CACHE'] = '../../hf_cache/'
+
+def inverse_sigmoid(x):
+    return float(np.log((x + 1e-8) / (1 - x + 1e-8)))
 
 class ViNLIZaloDataset(Dataset):
     def __init__(self, 
@@ -14,7 +18,7 @@ class ViNLIZaloDataset(Dataset):
                  reverse_input=True,
                  **kwargs):
         raw_data = json.load(open(data_path, 'r')) if data_path else []
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer) \
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, cache_dir=kwargs['hf_cache']) \
                         if isinstance(tokenizer, str) else tokenizer
         self.max_length = max_length
         self.input_fields = input_fields
@@ -124,8 +128,11 @@ class ViNLIZaloDataset(Dataset):
     def load_from_disk(cls, json_path, **kwargs):
         params = json.load(open(json_path, 'r'))
         tokenizer = params['tokenizer']
-        assert tokenizer == kwargs['tokenizer'] if isinstance(kwargs['tokenizer'], str) \
-                            else kwargs['tokenizer'].name_or_path, f'Tokenizer card does not match!'
+        if isinstance(kwargs['tokenizer'], str):
+            assert tokenizer == kwargs['tokenizer'], f'Tokenizer card does not match!'
+        else:
+            assert tokenizer == kwargs['tokenizer'].name_or_path, f'Tokenizer card does not match!'
+            tokenizer = kwargs['tokenizer']
         max_length = kwargs['max_length']
         input_fields = kwargs['input_fields']
         reverse_input = params['reverse_input']
@@ -143,7 +150,7 @@ class ViNLIZaloRegressionDataset(ViNLIZaloDataset):
     
     def __getitem__(self, index):
         item = super().__getitem__(index)
-        item['labels'] = float(item['labels']) * 100
+        item['labels'] = inverse_sigmoid(item['labels'])
         return item
     
     
@@ -275,7 +282,7 @@ class IRSegmentRegressionDataset(IRSegmentDataset):
         
     def __getitem__(self, index):
         item = super().__getitem__(index)
-        item['labels'] = float(item['labels']) * 100
+        item['labels'] = inverse_sigmoid(item['labels'])
         return item
     
 
@@ -290,7 +297,7 @@ class ViMMRCSegmentRegressionDataset(IRSegmentDataset):
         
     def __getitem__(self, index):
         item = super().__getitem__(index)
-        item['labels'] = float(item['labels']) * 100
+        item['labels'] = inverse_sigmoid(item['labels'])
         return item
     
     
@@ -303,13 +310,7 @@ class BasicNLIDataset(ViNLIZaloDataset):
                  input_fields=['input_ids', 'token_type_ids', 'attention_mask', 'labels', 'position_ids'],
                  reverse_input=True,
                  **kwargs):
-        raw_data = []
-        if data_path:
-            with open(data_path, 'r') as f:
-                csv_reader = csv.DictReader(f)
-                for row in csv_reader:
-                    raw_data.append(row)
-                f.close()
+        raw_data = json.load(open(data_path, 'r')) if data_path else []
             
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer) \
                         if isinstance(tokenizer, str) else tokenizer
@@ -354,3 +355,62 @@ class BasicNLIDataset(ViNLIZaloDataset):
             except Exception as e:
                 print(e.args)
         super().__init__(None, self.data, self.tokenizer, self.max_length, self.input_fields, self.reverse_input, **kwargs)
+        
+class DocToQueryDataset(ViNLIZaloDataset):
+    def __init__(self,
+                data_path='../data/ViNLI-Zalo-supervised.json', 
+                processed_data=None,
+                tokenizer='vinai/phobert-base-v2',
+                max_length=512,
+                input_fields=['input_ids', 'attention_mask', 'labels', 'position_ids'],
+                 **kwargs) -> None:
+        raw_data = json.load(open(data_path, 'r')) if data_path else []
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer, cache_dir=kwargs['hf_cache']) \
+                        if isinstance(tokenizer, str) else tokenizer
+        self.max_length = max_length
+        self.input_fields = input_fields
+        self.data = []
+        if processed_data is not None:
+            self.data = processed_data
+        position_ids = list(range(0, self.max_length))
+        for item in raw_data:
+            try:
+                query = item['query']
+                context = item['context']
+                tokenized = self.tokenizer.__call__(text=context,
+                                           text_target=query,
+                                           max_length=self.max_length,
+                                           return_attention_mask=True,
+                                           return_token_type_ids=False)
+                input_item = dict(**tokenized, position_ids=position_ids)
+                self.data.append(input_item)
+            except Exception as e:
+                print(e.args)
+        super().__init__(None, 
+                         self.data, 
+                         self.tokenizer, 
+                         self.max_length, 
+                         self.input_fields, 
+                         **kwargs)
+    
+    def padding(self, item):
+        if item['input_ids'].__len__() < self.max_length:
+            item['input_ids'] += [self.tokenizer.pad_token_id] * (self.max_length - item['input_ids'].__len__())
+        elif item['input_ids'].__len__() > self.max_length:
+            item['input_ids'] = item['input_ids'][:self.max_length]
+        
+        if item['attention_mask'].__len__() < self.max_length:
+            item['attention_mask'] += [self.tokenizer.pad_token_id] * (self.max_length - item['attention_mask'].__len__())
+        elif item['attention_mask'].__len__() > self.max_length:
+            item['attention_mask'] = item['attention_mask'][:self.max_length]
+        
+        if item['labels'].__len__() < self.max_length:
+            item['labels'] += [self.tokenizer.pad_token_id] * (self.max_length - item['labels'].__len__())
+        elif item['labels'].__len__() > self.max_length:
+            item['labels'] = item['labels'][:self.max_length]
+            
+        if item['position_ids'].__len__() < self.max_length:
+            item['position_ids'] += [self.tokenizer.pad_token_id] * (self.max_length - item['position_ids'].__len__())
+        elif item['position_ids'].__len__() > self.max_length:
+            item['position_ids'] = item['position_ids'][:self.max_length]
+        return item 

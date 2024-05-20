@@ -1,0 +1,153 @@
+version: '2.25'
+services:
+  backend-api:
+    image: rag-backend-api:1.0
+    container_name: rag-backend-server
+    ports:
+      - 9204:5004
+    volumes:
+      - /workspace/nlplab/kienvt/KLTN/proc2-be_llm/backend:/app
+      - /workspace/nlplab/kienvt/KLTN/proc1-extract_storage/hf_cache:/hf_cache
+      # - /workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp:/vncorenlp
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - HF_TOKEN=${HF_TOKEN}
+      - LLM_SERVER_API_KEY=${LLM_SERVER_API_KEY}
+      - LOGIT_BIAS=${LOGIT_BIAS}
+    networks:
+      - scada
+      - docker-elk_elk
+    restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['all']
+            capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5004/ || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+      
+
+  # llm_inference:
+  #   image: hf-llm-chatbot:4.0
+  #   container_name: hf-llm-chatbot
+  #   ports:
+  #     - 9104:5002
+  #   volumes:
+  #     - /workspace/nlplab/kienvt/KLTN/proc2-be_llm/llm_inference:/app
+  #     - /workspace/nlplab/kienvt/scada-llm-chatbot:/hf_cache
+  #   environment:
+  #     - USERNAME=${USERNAME}
+  #     - PASSWORD=${PASSWORD}
+  #     - HF_TOKEN=${HF_TOKEN}
+  #     - LLM_SERVER_API_KEY=${LLM_SERVER_API_KEY}
+  #   networks:
+  #     - scada
+  #     # - docker-elk_elk
+  #   restart: unless-stopped
+  #   runtime: nvidia
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #         - driver: nvidia
+  #           device_ids: ['all']
+  #           capabilities: [gpu]
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:5002/ || exit 1"]
+  #     interval: 60s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 60s
+
+  llama-cpp-platform:
+    image: llama-cpp-full:cuda
+    container_name: llm-inference-platform-cuda
+    command: --server -m ${MODEL_PATH} -c 4096 -fa --host 0.0.0.0 --port 8080 --n-gpu-layers 291 --api-key ${LLM_SERVER_API_KEY}
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - HF_TOKEN=${HF_TOKEN}
+      - LLM_SERVER_API_KEY=${LLM_SERVER_API_KEY}
+      - LOGIT_BIAS=${LOGIT_BIAS}
+    ports:
+      - 9404:8080
+    volumes:
+      - /workspace/nlplab/kienvt/KLTN/proc2-be_llm/llm_inference:/models
+      - /workspace/nlplab/kienvt/KLTN/Vistral-7B-Chat-gguf:/models/orig_model
+    networks:
+      - scada
+    restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['all']
+            capabilities: [gpu] 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  chat-engine:
+    image: vr-chat-engine:1.0
+    container_name: vr-chat-engine
+    ports:
+      - 9304:5006
+    volumes:
+      - /workspace/nlplab/kienvt/KLTN/proc2-be_llm/chat-engine:/app
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
+      - HF_TOKEN=${HF_TOKEN}
+      - LLM_SERVER_API_KEY=${LLM_SERVER_API_KEY}
+      - LOGIT_BIAS=${LOGIT_BIAS}
+    networks:
+      - scada
+    restart: unless-stopped
+    depends_on:
+      backend-api:
+        condition: service_healthy
+      # llm_inference:
+      #   condition: service_healthy
+      llama-cpp-platform:
+        condition: service_healthy
+
+  # corrector-api:
+  #   image: vietnamese-corrector:2.0
+  #   container_name: corrector-server
+  #   ports:
+  #     - 9304:6004
+  #   volumes:
+  #     - /workspace/nlplab/kienvt/KLTN/proc1-extract_storage:/app
+  #     - /workspace/nlplab/kienvt/KLTN/proc1-extract_storage/hf_cache:/home/root/.cache/huggingface/hub
+  #   networks:
+  #     - scada
+  #     - docker-elk_elk
+  #   restart: unless-stopped
+  #   runtime: nvidia
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #         - driver: nvidia
+  #           device_ids: ['all']
+  #           capabilities: [gpu]
+
+
+networks:
+  scada:
+    external: true
+  docker-elk_elk:
+    external: true

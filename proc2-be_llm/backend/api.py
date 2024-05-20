@@ -1,13 +1,17 @@
 from fastapi import FastAPI
 import gradio as gr
 from app import demo
+import os
 
 app = FastAPI()
+
+username = os.getenv('USERNAME')
+password = os.getenv('PASSWORD')
 
 app = gr.mount_gradio_app(app, 
                           demo.queue(max_size=10), 
                           path='/api', 
-                          auth=('admin', '1'),
+                          auth=(username, password),
                           app_kwargs={"docs_url": "/docs"},
                           favicon_path='./favicon.png')
 

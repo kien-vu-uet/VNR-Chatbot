@@ -16,6 +16,6 @@ async def root():
 app = gr.mount_gradio_app(app, 
                           demo.queue(max_size=50), 
                           path='/chat',
-                          auth=(username, password),
+                        #   auth=(username, password),
                           app_kwargs={"docs_url": "/docs"},
                           )

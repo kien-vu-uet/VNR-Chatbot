@@ -5,46 +5,20 @@ from typing import Iterator, List, Tuple
 import gradio as gr
 import spaces
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer, BitsAndBytesConfig
+import huggingface_hub
+from gradio_client import Client
 
-MAX_MAX_NEW_TOKENS = 2048
-DEFAULT_MAX_NEW_TOKENS = 1024
-MAX_INPUT_TOKEN_LENGTH = int(os.getenv("MAX_INPUT_TOKEN_LENGTH", "4096"))
-SYS_PROMPT = "A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions based on previous responses of assistant." \
-    "\nAs the intent analysis assistant, analyze and break down the script into single statements (if any) so that the software can execute sequentially. " \
-    "Note: you only need to provide results with a similar layout to the output in the above examples, no other information is needed. " \
-    "At the same time, pay attention to linking words and determine their role in separating sentences. You can refer to the examples below to be able to separate the required sentence."   
-        
-CHAT_HISTORY = [
-    (
-        "Vẽ hình tròn màu đen ở vị trí (20, 40) rồi tô màu đen cho nó.", 
-        "- Vẽ hình tròn màu đen ở vị trí (20, 40).\n- Tô màu đen cho hình tròn ở vị trí (20, 40)"
-    ),
-    (
-        "Vẽ hình vuông và hình tròn với cùng kích thước 40 x 40 tại 2 vị trí là (24, 14) và góc trên bên trái màn hình.",
-        "- Vẽ hình vuông có kích thước 40 x 40 tại vị trí (24, 14).\n- Vẽ hình tròn có kích thước 40 x 40 tại vị trí góc trên bên trái màn hình."
-    ),
-    (
-        "Xoay hình vuông có cạnh dài 50 pixel sang phải 15 độ rồi tô màu đen cho nó.",
-        "- Xoay hình vuông có cạnh dài 50 pixel sang phải 15 độ.\n- Tô màu đen cho hình vuông có cạnh dài 50 pixel."
-    ),
-    (
-        'Vẽ hình mũi tên có chiều rộng và chiều cao lần lượt là 70 và 30 ở chính giữa sau đó tạo bản sao của nó ở góc bên trái.',
-        '- Vẽ hình mũi tên có chiều rộng và chiều cao lần lượt là 70 và 30 ở vị trí chính giữa.\n- Sao chép.\n- Dán vào góc bên trái'
-    ),
-    (
-        'Vẽ hình vuông và hình tròn có cùng kích thước là 30 pixel ở trung tâm, ở phía góc trái đặt 1 hình mũi tên màu đen có kích thước 230x34',
-        '- Vẽ hình vuông có kích thước là 30 pixel ở trung tâm.\n- Vẽ hình tròn có kích thước là 30 pixel ở trung tâm.\n- Ở phía góc trái đặt 1 hình mũi tên màu đen có kích thước 230x34.'
-    ),
-    (
-        'Tạo hình bình hành màu xanh dương , có chiều dài đáy là 25 đơn vị , chiều cao là 35 đơn vị , nằm ở vị trí tương đối trên cùng bên phải.',
-        '- Tạo hình bình hành màu xanh dương , có chiều dài đáy là 25 đơn vị , chiều cao là 35 đơn vị , nằm ở vị trí tương đối trên cùng bên phải.'
-    ),
-    (
-        'Hãy vẽ 1 hình vuông ở góc bên trái có chiều rộng là 30 pixel đồng thời vẽ 1 hình tròn nằm bên trong nó có bán kính bằng 1/2 chiều rộng, sau đó đổ màu vàng cho chúng.',
-        '- Vẽ hình vuông ở góc bên trái có chiều rộng là 30 pixel và có màu vàng.\n- Vẽ hình tròn ở góc bên trái có bán kính là 15 pixel và có màu vàng.'
-    )
-] 
+import requests, json
+
+MAX_NEW_TOKENS = 4096
+DEFAULT_MAX_NEW_TOKENS = 512
+MAX_INPUT_TOKEN_LENGTH = int(os.getenv("MAX_INPUT_TOKEN_LENGTH", "2048"))
+SYS_PROMPT = "Bạn là một trợ lý tư vấn pháp lý về các vấn đề Luật và Quy chuẩn - Tiêu chuẩn. "\
+             "Hãy suy luận để phản hồi các yêu cầu của người dùng dựa trên tài liệu hoặc thông tin được cung cấp (nếu có). " \
+             "Nếu một câu hỏi không có ý nghĩa hoặc không hợp lý về mặt thông tin, hãy giải thích tại sao thay vì trả lời một điều gì đó không chính xác. " \
+             "Nếu bạn không biết câu trả lời cho một câu hỏi hoặc không tìm thấy thông tin liên quan, hãy trả lời là bạn không biết và vui lòng không chia sẻ thông tin sai lệch."
+            #  "Based on the information provided by the retrieval system and argue to answer the user's question" 
         
 DESCRIPTION = """\
 # Llama-2 7B Chat
@@ -67,71 +41,140 @@ this demo is governed by the original [license](https://huggingface.co/spaces/hu
 if not torch.cuda.is_available():
     DESCRIPTION += "\n<p>Running on CPU 🥶 This demo does not work on CPU.</p>"
 
+model_id = "Viet-Mistral/Vistral-7B-Chat"
+tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir='/hf_cache')
+tokenizer.use_default_system_prompt = False
+# if torch.cuda.is_available():
+#     huggingface_hub.login(os.getenv('HF_TOKEN'))
+#     # model_id = "capleaf/T-Llama"
+#     # peft_model_id = "kien-vu-uet/T-Llama-sft-registration-domain"
+#     model_id = "Viet-Mistral/Vistral-7B-Chat"
+#     peft_model_id = "kien-vu-uet/Vistral-sft-registration-domain"
+    
+#     bnb_config = BitsAndBytesConfig(
+#         load_in_4bit=True,
+#         bnb_4bit_quant_type="nf4",
+#         bnb_4bit_compute_dtype=torch.bfloat16,
+#         bnb_4bit_use_double_quant=True,
+#     )
+#     model = AutoModelForCausalLM.from_pretrained(model_id, 
+#                                                 #  torch_dtype=torch.bfloat16, 
+#                                                  quantization_config=bnb_config,
+#                                                  device_map="auto", 
+#                                                  cache_dir='/hf_cache')
+#     model.load_adapter(peft_model_id)
 
-if torch.cuda.is_available():
-    # model_id = "vilm/vinallama-7b-chat"
-    # model_id = "LR-AI-Labs/vbd-llama2-7B-50b-chat"
-    model_id = "Viet-Mistral/Vistral-7B-Chat"
-    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto", cache_dir='/hf_cache')
-    tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir='/hf_cache')
-    tokenizer.use_default_system_prompt = False
 
 
-@spaces.GPU
+# @spaces.GPU
 def generate(
     message: str,
     chat_history: List[Tuple[str, str]],
+    input_file:str,
     system_prompt: str,
     max_new_tokens: int = 1024,
     temperature: float = 0.6,
     top_p: float = 0.9,
     top_k: int = 50,
     repetition_penalty: float = 1.2,
+    activate_chat_history: bool = False,
 ) -> Iterator[str]:
-    conversation = []
+    conversation = [] 
     if system_prompt:
+        system_prompt = SYS_PROMPT
         conversation.append({"role": "system", "content": system_prompt})
-    for user, assistant in chat_history:
-        conversation.extend([{"role": "user", "content": user}, {"role": "assistant", "content": assistant}])
-    conversation.append({"role": "user", "content": message})
-
-    input_ids = tokenizer.apply_chat_template(conversation, return_tensors="pt")
-    if input_ids.shape[1] > MAX_INPUT_TOKEN_LENGTH:
-        input_ids = input_ids[:, -MAX_INPUT_TOKEN_LENGTH:]
-        gr.Warning(f"Trimmed input from conversation as it was longer than {MAX_INPUT_TOKEN_LENGTH} tokens.")
-    input_ids = input_ids.to(model.device)
-
-    streamer = TextIteratorStreamer(tokenizer, timeout=10.0, skip_prompt=True, skip_special_tokens=True)
-    generate_kwargs = dict(
-        {"input_ids": input_ids},
-        streamer=streamer,
-        max_new_tokens=max_new_tokens,
-        do_sample=True,
-        top_p=top_p,
-        top_k=top_k,
-        temperature=temperature,
-        num_beams=1,
-        repetition_penalty=repetition_penalty,
-        eos_token_id=tokenizer.eos_token_id,
-        pad_token_id=tokenizer.pad_token_id 
-    )
-    t = Thread(target=model.generate, kwargs=generate_kwargs)
-    t.start()
+    if activate_chat_history:
+        for user, assistant in chat_history:
+            conversation.extend([{"role": "user", "content": user}, {"role": "assistant", "content": assistant}])
+    if input_file:
+        input = open(input_file, 'r').read()
+        conversation.append({"role": "user", "content": input})
+    else:
+        conversation.append({"role": "user", "content": message})
+        
+    prompt = tokenizer.apply_chat_template(conversation, tokenize=False) \
+                        .replace(tokenizer.bos_token, '') \
+                        .replace(tokenizer.eos_token, '')
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization':  f"Bearer {os.getenv('LLM_SERVER_API_KEY')}"
+    }
+    json_data = {
+        "prompt": prompt, 
+        "n_predict": max_new_tokens,
+        "seed": "-1",
+        "temp": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "logit_bias": "38368-inf",
+        "repeat_penalty": repetition_penalty,
+        "repeat_last_n": 64,
+        "stream": True
+    }
+    
+    response = requests.post('http://llm-inference-platform-cuda:8080/completion', 
+                             headers=headers, 
+                             json=json_data, 
+                             stream=True)
 
     outputs = []
-    for text in streamer:
-        outputs.append(text)
-        yield "".join(outputs)
+    for chunk in response.iter_content(chunk_size=1024):
+        if chunk:
+            try:
+                text = json.loads(chunk.decode()[6:])['content']
+                outputs.append(text)
+                yield "".join(outputs)
+            except Exception as e:
+                print(e.args)
+        
+    # input_ids = tokenizer.apply_chat_template(conversation, return_tensors="pt")
+    
+    # if input_ids.shape[1] > MAX_INPUT_TOKEN_LENGTH:
+    #     input_ids = input_ids[:, -MAX_INPUT_TOKEN_LENGTH:]
+    #     gr.Warning(f"Trimmed input from conversation as it was longer than {MAX_INPUT_TOKEN_LENGTH} tokens.")
+    # input_ids = input_ids.to(model.device)
+
+    # streamer = TextIteratorStreamer(tokenizer, timeout=10.0, skip_prompt=True, skip_special_tokens=True)
+    # generate_kwargs = dict(
+    #     {"input_ids": input_ids},
+    #     streamer=streamer,
+    #     max_new_tokens=max_new_tokens,
+    #     do_sample=True,
+    #     top_p=top_p,
+    #     top_k=top_k,
+    #     temperature=temperature,
+    #     num_beams=1,
+    #     no_repeat_ngram_size=2,
+    #     repetition_penalty=repetition_penalty,
+    #     eos_token_id=tokenizer.eos_token_id,
+    #     pad_token_id=tokenizer.pad_token_id 
+    # )
+    # t = Thread(target=model.generate, kwargs=generate_kwargs)
+    # t.start()
+
+    # outputs = []
+    # for text in streamer:
+    #     outputs.append(text)
+    #     yield "".join(outputs)
+    # del input_ids
+    # t.join()
 
 
 chat_interface = gr.ChatInterface(
     fn=generate,
     additional_inputs=[
+        gr.File(
+            label='Input file',
+            file_count='single',
+            file_types=['text'],
+            type='filepath',
+            value=None,
+        ),
         gr.Textbox(label="System prompt", lines=6, value=SYS_PROMPT),
         gr.Slider(
             label="Max new tokens",
             minimum=1,
-            maximum=MAX_MAX_NEW_TOKENS,
+            maximum=MAX_NEW_TOKENS,
             step=1,
             value=DEFAULT_MAX_NEW_TOKENS,
         ),
@@ -140,14 +183,14 @@ chat_interface = gr.ChatInterface(
             minimum=0.1,
             maximum=4.0,
             step=0.1,
-            value=0.1,
+            value=0.3,
         ),
         gr.Slider(
             label="Top-p (nucleus sampling)",
             minimum=0.05,
             maximum=1.0,
             step=0.05,
-            value=1.0,
+            value=0.9,
         ),
         gr.Slider(
             label="Top-k",
@@ -161,8 +204,12 @@ chat_interface = gr.ChatInterface(
             minimum=1.0,
             maximum=2.0,
             step=0.05,
-            value=1.0,
+            value=1.05,
         ),
+        gr.Checkbox(
+            label='Activate chat history',
+            value=False,
+        )
     ],
     stop_btn="Stop",
     examples=[
@@ -174,10 +221,12 @@ chat_interface = gr.ChatInterface(
     ],
 )
 
-with gr.Blocks(css="style.css") as demo:
+with gr.Blocks(css="style.css", title='LLM-Inference') as demo:
     # gr.Markdown(DESCRIPTION)
     # gr.DuplicateButton(value="Duplicate Space for private use", elem_id="duplicate-button")
     chat_interface.render()
+    # for component in chat_interface.additional_inputs:
+    #     component.visible = False
     # gr.Markdown(LICENSE)
 
 # if __name__ == "__main__":    
@@ -194,3 +243,19 @@ with gr.Blocks(css="style.css") as demo:
 #         debug=True
 #         # share_server_address='0.0.0.0:7860'
 #         )
+
+
+# /workspace/nlplab/kienvt/KLTN/llama.cpp/main \
+    # -m ./peft_model/Vistral-7B-quantized.gguf \
+        # --seed "-1" \
+            # -c 2048 \
+                # -f prompt.txt \
+                    # -n 512 \
+                        # --temp 0.1 \
+                            # --top-p 0.95 \
+                                # --top-k 40 \
+                                    # --logit-bias 38368-inf \
+                                        # --repeat-penalty 1.05 \
+                                            # --repeat-last-n 64 \
+                                                # --log-disable \
+                                                    # --color 

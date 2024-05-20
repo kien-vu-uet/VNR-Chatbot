@@ -5,20 +5,23 @@ from torch.utils.data import Dataset
 import torch
 import re
 # from underthesea import text_normalize
-import py_vncorenlp
+# import py_vncorenlp
 from typing import List
 import requests
-
+import os 
+ 
+ 
+os.environ['TRANSFORMERS_CACHE'] = './hf_cache'
 # vncorenlp_segmentor = py_vncorenlp.VnCoreNLP(annotators=['wseg'], 
 #                                             #  max_heap_size='-Xmx4g',
 #                                              save_dir='/workspace/nlplab/kienvt/scada-tokenize-server/vncorenlp')
-corrector = pipeline("text2text-generation", model="bmd1905/vietnamese-correction-v2", device=0, max_new_tokens=512)
+corrector = pipeline("text2text-generation", model="bmd1905/vietnamese-correction-v2", device_map='auto', max_new_tokens=512)
 # tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 app = Flask(__name__)
 BSZ = 8
 # MAX_LENGTH = 100
 # OVERLAPSE = 0.5
-
+print(torch.__version__)
 class MyDataset(Dataset):
     def __init__(self, document: List[str]): 
         self._document = []
@@ -26,7 +29,7 @@ class MyDataset(Dataset):
             _doc = re.sub(r'\.(\s)?\.', '.', doc)
             i = 0
             _doc = _doc.replace('\t', ' ').replace('\n', ' ')
-            response = requests.post(url='http://localhost:9091/segment2', 
+            response = requests.post(url='http://192.168.16.4:9091/segment2', 
                                  json={'text': _doc, 'sent_separator': "<\\>"})
             _doc = response.json().get('sent').split("<\\>")
             # _doc = [d for d in _doc.split('.') if len(d.strip()) > 0]

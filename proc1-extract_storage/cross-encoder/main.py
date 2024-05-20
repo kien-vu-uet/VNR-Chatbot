@@ -9,6 +9,7 @@ from transformers import AutoTokenizer
 from tqdm import tqdm
 # from torch.nn.parallel import DistributedDataParallel, DataParallel
 from torch.utils.data import ConcatDataset
+from lightning.pytorch.trainer import Trainer
 
 start = time.time()
 
@@ -78,9 +79,9 @@ def train(model, device, data_loader, optimizer, opt):
         
     scores = torch.tensor(scores, dtype=torch.float16, device=device).T
     top_scores = torch.topk(scores, k=1, largest=True, dim=-1)
-    print("Best optimized loss model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[0].item() + opt['start_epoch']}.pt", f'Loss: {-top_scores.values[0].item() + opt['start_epoch']:.4f}')
-    print("Best accurated model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[1].item() + opt['start_epoch']}.pt", f'Acc: {top_scores.values[1].item() + opt['start_epoch']:.2f}')
-    print("Best optimized f1 model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[2].item() + opt['start_epoch']}.pt", f'F1: {top_scores.values[2].item() + opt['start_epoch']:.2f}')
+    print("Best optimized loss model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[0].item() + opt['start_epoch']}.pt", f"Loss: {-top_scores.values[0].item() + opt['start_epoch']:.4f}")
+    print("Best accurated model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[1].item() + opt['start_epoch']}.pt", f"Acc: {top_scores.values[1].item() + opt['start_epoch']:.2f}")
+    print("Best optimized f1 model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[2].item() + opt['start_epoch']}.pt", f"F1: {top_scores.values[2].item() + opt['start_epoch']:.2f}")
 
 
 def test(device, data_loader, opt):
@@ -130,13 +131,13 @@ def test(device, data_loader, opt):
 
     scores = torch.tensor(scores, dtype=torch.float, device=device).T
     top_scores = torch.topk(scores, k=1, largest=True, dim=-1)
-    print("Best optimized loss model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[0].item()}.pt", f'Loss: {-top_scores.values[0].item():.4f}')
-    print("Best accurated model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[1].item()}.pt", f'Acc: {top_scores.values[1].item():.2f}')
-    print("Best optimized f1 model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[2].item()}.pt", f'F1: {top_scores.values[2].item():.2f}')
+    print("Best optimized loss model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[0].item()}.pt", f"Loss: {-top_scores.values[0].item():.4f}")
+    print("Best accurated model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[1].item()}.pt", f"Acc: {top_scores.values[1].item():.2f}")
+    print("Best optimized f1 model: ", f"{opt['model_checkpoints']}/epoch_{top_scores.indices[2].item()}.pt", f"F1: {top_scores.values[2].item():.2f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="Path to config file", type=str, default='./config/default.yml')
+    parser.add_argument("--config", help="Path to config file", type=str, default='./config/roberta-base.yml')
     args = parser.parse_args()
     
     with open(args.config, 'r') as f:
@@ -183,11 +184,11 @@ if __name__ == "__main__":
     os.environ['CUDA_LAUNCH_BLOCKING']='1'
     device = torch.device(opt['device'])    
     # torch.cuda.seed_all()
-    if opt['do_train']:
-        print("TRAINING PROCESS ...")
-        train(model, device, train_loader, optimizer, opt)
-    print("EVALUATING PROCESS ...")
-    test(device, test_loader, opt)
+    # if opt['do_train']:
+    #     print("TRAINING PROCESS ...")
+    #     train(model, device, train_loader, optimizer, opt)
+    # print("EVALUATING PROCESS ...")
+    # test(device, test_loader, opt)
     
 
     

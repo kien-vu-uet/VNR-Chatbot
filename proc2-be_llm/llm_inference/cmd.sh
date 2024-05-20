@@ -1,0 +1,1 @@
+--server -m /models/peft_model/Vistral-7B-quantized.gguf -c 4096 --host 0.0.0.0 --port 8080 --api-key ${LLM_SERVER_API_KEY}

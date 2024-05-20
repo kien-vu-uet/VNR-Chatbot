@@ -1,0 +1,33 @@
+
+seed: 42
+
+datasets:  
+  qa-advise-source:
+    data_path: "./data/no_segment/qa-advise-source-triplet.json"
+    train_path: "./data/train_test_split/qa-advise-source-triplet-train.json"
+    test_path: "./data/train_test_split/qa-advise-source-triplet-test.json"
+    data_module: "TripletDataset"
+    test_size: 0.3
+    reverse_input: true
+    force_remake: false
+
+hf_cache: "./hf_cache"
+max_length: 258
+
+# tokenizer: pyvi
+pretrained_path: 'minhquy1624/NLI_xnli2_STS'
+problem_type: 'Triplet'
+
+criterion: 'TripletLoss'
+
+max_epochs: 30
+batch_size: 128
+
+shuffle_train: true
+shuffle_test: false
+num_workers: 1
+device: "cuda"
+optimizer: "AdamW"
+lr: 0.00005
+model_checkpoints: "./model_checkpoints/biencoder-triplet-finetuned/"
+train_from_last_epoch: true

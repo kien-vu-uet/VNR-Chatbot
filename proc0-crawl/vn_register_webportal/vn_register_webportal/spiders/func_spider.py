@@ -1,16 +1,16 @@
 import scrapy
 from bs4 import BeautifulSoup
-import os
+import os, re
 from typing import Tuple
 
-ATTM_PATH = '/workspace/nlplab/kienvt/KLTN/proc0-crawl/attachments/web-info'
+ATTM_PATH = '/workspace/nlplab/kienvt/KLTN/proc0-crawl/attachments/web-info/technical-services'
 if not os.path.exists(ATTM_PATH):
     os.mkdir(ATTM_PATH)
 
 class FuncSpiderSpider(scrapy.Spider):
     name = "func_spider"
     allowed_domains = ["vr.org.vn", "192.168", "vrqc.vn", "app.vr.org.vn"]
-    start_urls = ["http://www.vr.org.vn/Pages/sitemap.aspx"]
+    start_urls = ["http://www.vr.org.vn/dich-vu-ky-thuat/Pages/default.aspx"]
     ignore_urls = ['van-ban', 'quy-chuan-tieu-chuan', 'tin-tuc-su-kien']
     current_item_id = 99999
     urls = []
@@ -76,14 +76,25 @@ class FuncSpiderSpider(scrapy.Spider):
     def parse_page(self, response):
         title, para = self.get_text(response.css('div.full-left').get())
         if title is not None and para is not None:
-            self.current_item_id += 1
-            with open(os.path.join(ATTM_PATH, f'{self.current_item_id}-{title}.txt'), 'w', encoding='utf-8') as f:
-                f.write(para)
-                f.close()
+            try:
+                item_id = int(re.search(r'ItemID=\d+', response.url).group(0).lstrip('ItemID='))
+                para_ = para.split('\n')
+                title = para_[0]
+                para = '\n'.join(para_[1:])
+                file_name = f'{item_id}-{title}.txt'
+            except: 
+                self.current_item_id += 1
+                item_id = self.current_item_id
+                file_name = f'{item_id}-{title}.txt'
+            # os.mkfifo
+            # with open(os.path.join(ATTM_PATH, file_name), 'w', encoding='utf-8') as f:
+            #     f.write(para)
+            #     f.close()
             yield {
-                "item_id": self.current_item_id,
+                "item_id": item_id,
                 "page_url": response.url,
                 "title": title,
+                "content": para
             }
         else:
             self.error_urls.append(response.url)

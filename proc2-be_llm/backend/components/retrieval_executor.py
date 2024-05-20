@@ -1,6 +1,7 @@
 from typing import Any, List, Tuple, Dict
 from sentence_transformers import CrossEncoder
 from components.elasticsearch_client import ElasticSearchExecutor
+import components.expansion_executor as EE
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -11,6 +12,14 @@ from tqdm import tqdm
 def sigmoid_norm(input, scale, offset):
     return (input ** offset) / ((scale ** offset) + (input ** offset))
 
+def _get_competive_encoder_path(index:str, competitive_matrix:Dict) -> str:
+    keys = list(competitive_matrix.keys())
+    sorted_keys = sorted(keys, key=lambda x:len(x), reverse=True)
+    for key in sorted_keys:
+        if key in index:
+            return competitive_matrix.get(key)
+    return None
+
 class RetrievalExecutor:
     def __init__(self,  model_name_or_path,
                         cache_dir,
@@ -19,25 +28,33 @@ class RetrievalExecutor:
                         batch_size, 
                         max_length,
                         ranking_strategy,
+                        max_pool_size,
                         weights,
                         num_workers,
-                        apply_rerank_softmax,
+                        expand_pool,
+                        # apply_rerank_softmax,
                         **kwargs) -> None:
+        huggingface_hub.login(hf_token)
         self.es_executor = ElasticSearchExecutor(device=device, cache_dir=cache_dir, 
                                                  **kwargs['elastic_search'], **kwargs['encoder'])
         self.rerank_model = CrossEncoder(model_name_or_path, device=device, max_length=max_length,
                                         automodel_args={"cache_dir": cache_dir, "token": hf_token})
-        huggingface_hub.login(hf_token)
+        self.max_pool_size = max_pool_size
         self.batch_size = batch_size
         self.device = device
         self.ranking_strategy = ranking_strategy
         self.num_workers = num_workers
-        self.apply_rerank_softmax = apply_rerank_softmax
+        self.apply_rerank_softmax = self.rerank_model.config.num_labels >= 2
         self.torch_dtype = torch.float32 if self.device == 'cpu' else torch.float16
+        self._expand_pool = getattr(EE, expand_pool['name'])(es_executor=self.es_executor, 
+                                                             device=device, 
+                                                             cache_dir=cache_dir, 
+                                                             **expand_pool['params'])
+        self._expand_first = expand_pool['expand_first']
         if weights is None:
-            self.weights = torch.tensor([1.0, 1.0], dtype=self.torch_dtype, device=self.device).view(-1)
+            self.weights = torch.tensor([1.0, 1.0, 1.0], dtype=self.torch_dtype, device=self.device).view(-1)
         else:
-            self.weights = [v for k,v in weights.items()]
+            self.weights = [weights['bm25'], weights['knn'], weights['rerank']]
             self.weights = torch.tensor(self.weights, dtype=self.torch_dtype, device=self.device).view(-1)
             
     @property
@@ -52,12 +69,18 @@ class RetrievalExecutor:
             "apply_rerank_softmax": self.apply_rerank_softmax,
             "torch_dtype": self.torch_dtype.__str__(),
             "weights": self.weights.tolist(),
+            "expand_stategy": {
+                "executor": self._expand_pool.__dict__,
+                "expand_first": self._expand_first
+            }
         }
        
     def __prepare_content(self, header, content) -> str:
         sent_separator='<\\>'
-        segment_headers = self.es_executor._make_segment_query(header, sent_separator).split(sent_separator)
-        segment_contents = self.es_executor._make_segment_query(content, sent_separator).split(sent_separator)
+        segment_headers, _ = self.es_executor._make_segment_query(header, sent_separator)
+        segment_headers = segment_headers.split(sent_separator)
+        segment_contents, _ = self.es_executor._make_segment_query(content, sent_separator)
+        segment_contents = segment_contents.split(sent_separator)
         segment_headers.reverse()
         for _head in segment_headers:
             if _head not in segment_contents:
@@ -67,7 +90,8 @@ class RetrievalExecutor:
     def __call__(self, 
                  question: str, 
                  return_documents: bool = True,
-                 ) -> List[Any]:
+                 cache_explanation: bool = True,
+                 **kwargs) -> List[Any]:
         es_outputs = self.es_executor(question)
         es_scores = []
         documents = []
@@ -79,7 +103,7 @@ class RetrievalExecutor:
         scores = [item + [r_score] for item, r_score in zip(es_scores, rerank_scores)]
         scores = torch.tensor(scores, dtype=self.torch_dtype, device=self.device)
         weights = self.weights[:scores.shape[-1]]
-        final_scores = F.linear(scores, weights) / (torch.sum(weights) + weights[0])
+        final_scores = F.linear(scores, weights) / torch.sum(weights)
         top_scores = final_scores.cpu().tolist()
         indices = range(len(top_scores))
         
@@ -91,7 +115,7 @@ class RetrievalExecutor:
         final_outputs = [es_outputs[i].pop('_source') for i in indices]
         
         if return_documents:
-            return list(zip(self.__prepare_documents(final_outputs), top_scores))
+            return self.__prepare_documents(final_outputs, top_scores)
         return top_scores
         
     @staticmethod
@@ -131,7 +155,7 @@ class RetrievalExecutor:
         outputs = self.rerank_model.predict(inputs, 
                              batch_size=self.batch_size,
                              show_progress_bar=True,
-                             num_workers=self.num_workers,
+                             num_workers=0,
                              apply_softmax=self.apply_rerank_softmax,
                              convert_to_numpy=True
                              )
@@ -140,9 +164,10 @@ class RetrievalExecutor:
         outputs = outputs[:, -1].tolist()
         return outputs
     
-    def __prepare_documents(self, pool:Dict) -> List[str]:
+    def __prepare_documents(self, pool:List[Dict], scores:List) -> List[Tuple[str, List[float], float]]:
         mapping = {}
-        for item in pool:
+        for item, score in zip(pool[:self.max_pool_size], scores[:self.max_pool_size]):
+            item['score'] = score
             if item['symbol_number'] in mapping.keys():
                 mapping[item['symbol_number']].append(item)
             else:
@@ -151,24 +176,35 @@ class RetrievalExecutor:
         final_outputs = []     
         for symbol_number, items in mapping.items():
             item_outputs = []
-            prefix = f"""{items[0]['title']}\n{symbol_number}\n{items[0]['field']}"""
+            items = sorted(items, key=lambda x: x['chunk_index'], reverse=False)
+            scores_ = [item['score'] for item in items]
+            avg_score = sum(scores_) / len(scores_)
+            prefix = f"""METADATA: {items[0]['title']}\n{symbol_number}\n{items[0]['field']}"""
             item_outputs.append(prefix)
-            for item in items:
-                item_outputs.append(self.prepare_content(item['header'], item['content']))
-            final_outputs.append('\n'.join(item_outputs))
+            for i in range(len(items)):
+                item = items[i]
+                item_outputs.append(f"PASSAGE {i+1}: {self.__prepare_content(item['header'], item['content'])}")
+            final_outputs.append(('\n'.join(item_outputs), scores_, avg_score))
             
         return final_outputs
     
+    def _filter_duplicate(self, pool: List[Dict]) -> List[Dict]:
+        exist_id = []
+        filtered_pool = []
+        for item in pool:
+            if item['_id'] not in exist_id:
+                filtered_pool.append(item)
+                exist_id.append(item['_id'])
+        return filtered_pool
+    
     def rerank_with_expanded_query(self, 
                  question: str, 
-                 num_steps: int, 
-                 same_header: bool,
-                 expand_first: bool,
                  return_documents: bool = True,                     
                  **kwarg) -> List[Any]:
         es_outputs = self.es_executor(question)
-        if expand_first:
-            es_outputs = self._expand_pool(es_outputs, num_steps, same_header)
+        if self._expand_first:
+            es_outputs.extend(self._expand_pool(query=question, pool=es_outputs))
+            es_outputs = self._filter_duplicate(es_outputs)
         es_scores = []
         documents = []
         for hit in es_outputs:
@@ -179,7 +215,7 @@ class RetrievalExecutor:
         scores = [item + [r_score] for item, r_score in zip(es_scores, rerank_scores)]
         scores = torch.tensor(scores, dtype=self.torch_dtype, device=self.device)
         weights = self.weights[:scores.shape[-1]]
-        final_scores = F.linear(scores, weights) / (torch.sum(weights) + weights[0])
+        final_scores = F.linear(scores, weights) / torch.sum(weights)
         top_scores = final_scores.cpu().tolist()
         indices = range(len(top_scores))
         
@@ -190,94 +226,12 @@ class RetrievalExecutor:
             
         final_outputs = [es_outputs[i] for i in indices]
         
-        if not expand_first:
+        if not self._expand_first:
             rerank_outputs = [es_outputs[i] for i in indices]
-            final_outputs = self._expand_pool(rerank_outputs, num_steps, same_header)
+            final_outputs.extend(self._expand_pool(query=question, pool=rerank_outputs))
+            final_outputs = self._filter_duplicate(final_outputs)
         
         final_outputs = [item.pop('_source') for item in final_outputs]
         if return_documents:
-            return list(zip(self.__prepare_documents(final_outputs), top_scores))
+            return self.__prepare_documents(final_outputs, top_scores)
         return top_scores
-    
-    def _expand_pool(self, pool: Dict, 
-                    num_steps: int, 
-                    same_header: bool,
-                    **kwargs) -> Dict:
-        basic_query = []        
-        if 'bm25' in self.es_executor._last_query.keys():
-            bm25_query = deepcopy(self.es_executor._last_query['bm25'])
-            # basic_query.extend(bm25_query['function_score']['query']['bool']['should'])
-            basic_query.append(bm25_query)
-            
-        if 'knn' in self.es_executor._last_query.keys():
-            knn_query = deepcopy(self.es_executor._last_query['knn'])
-            knn_query.pop('k')
-            basic_query.append({'knn': knn_query})
-        
-        index_mapping = {}
-        header_mapping = {}
-
-        for item in pool:
-            item['_source'].pop('content_vector')
-            if item['_source']['symbol_number'] in index_mapping.keys():
-                index_mapping[item['_source']['symbol_number']].append(item['_source']['chunk_index'])
-            else:
-                index_mapping[item['_source']['symbol_number']] = [item['_source']['chunk_index']]
-                
-            header_mapping[item['_source']['symbol_number']] = item['_source']['header']
-        
-        expand_index_mapping = {k:[] for k,_ in index_mapping.items()}
-        
-        for symbol_number, chunk_indexs in index_mapping.items():
-            for idx in chunk_indexs:
-                expand_idx = [i for i in range(idx-num_steps, idx+num_steps+1) \
-                                if i not in chunk_indexs and i >= 0]
-                expand_index_mapping[symbol_number].extend(expand_idx)
-            expand_index_mapping[symbol_number] = list(set(expand_index_mapping[symbol_number]))
-            
-        expand_query = {
-            "bool": {
-                "should": []
-            }
-        }    
-        for symbol_number, chunk_indexs in expand_index_mapping.items():
-            query_item = [
-                {"match_phrase": {"symbol_number": symbol_number}},
-                {"terms": {"chunk_index": chunk_indexs}},
-            ]
-            if same_header:
-                query_item.append({"match_phrase": {"header": header_mapping[symbol_number]}})
-            
-            expand_query['bool']['should'].append(
-                {
-                    "bool": {
-                        "must": [
-                            *query_item
-                        ],
-                        "should": [
-                            *basic_query
-                        ]
-                    }
-                }
-            )
-            
-        response = self.es_executor.client.search(
-                                                index=self.es_executor.index,
-                                                query=expand_query,
-                                                explain=True)
-        
-        expand_outputs = []
-        for item in tqdm(response['hits']['hits'], desc='Rescore'):
-            bm25_score = 0
-            knn_score = 0
-            if item['_explanation']['details'][0]['details'][-1]['description'].startswith('min of:'):
-                bm25_score = item['_explanation']['details'][0]['details'][-1]['value']
-            elif item['_explanation']['details'][0]['details'][-1]['description'].startswith('within top'):
-                bm25_score = item['_explanation']['details'][0]['details'][-2]['value']
-                knn_score = item['_explanation']['details'][0]['details'][-1]['value']
-            item['_score'] = [bm25_score, knn_score]
-            item.pop('_explanation')
-            expand_outputs.append(item)
-
-        expand_outputs.extend(pool)   
-        return expand_outputs

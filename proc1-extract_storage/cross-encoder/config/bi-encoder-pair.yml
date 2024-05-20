@@ -1,0 +1,42 @@
+
+seed: 42
+
+datasets:  
+  qa-advise-source:
+    data_path: "./data/no_segment/qa-advise-source.json"
+    train_path: "./data/train_test_split/qa-advise-source-train.json"
+    test_path: "./data/train_test_split/qa-advise-source-test.json"
+    data_module: "PairDataset"
+    test_size: 0.3
+    reverse_input: true
+    force_remake: false
+  
+  ViNLI-Zalo:
+    data_path: "./data/no_segment/ViNLI-Zalo-supervised.json"
+    train_path: "./data/train_test_split/ViNLI-Zalo-supervised-train.json"
+    test_path: "./data/train_test_split/ViNLI-Zalo-supervised-test.json"
+    data_module: "ViNLIZaloDataset"
+    test_size: 0.3
+    reverse_input: false
+    force_remake: false
+
+hf_cache: "./hf_cache"
+max_length: 258
+
+# tokenizer: pyvi
+pretrained_path: 'minhquy1624/NLI_xnli2_STS'
+problem_type: 'BinaryClassification'
+
+criterion: 'ContrastiveLoss'
+
+max_epochs: 30
+batch_size: 128
+
+shuffle_train: true
+shuffle_test: false
+num_workers: 1
+device: "cuda"
+optimizer: "AdamW"
+lr: 0.000025
+model_checkpoints: "./model_checkpoints/biencoder-pair-finetuned/"
+train_from_last_epoch: true

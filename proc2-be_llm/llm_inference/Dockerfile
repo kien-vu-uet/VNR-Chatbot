@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY requirements.txt /app
 
-RUN pip3 install --no-cache-dir -r requirements.txt && \
-    pip3 install torch==1.12.1+cu113 --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu113 
+RUN pip3 install --no-cache-dir -r requirements.txt
+    # pip install torch==2.0.1
 
 EXPOSE 9104
 

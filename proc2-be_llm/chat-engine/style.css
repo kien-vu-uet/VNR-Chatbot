@@ -11,21 +11,13 @@ h1 {
 }
 
 .contain {
-  max-width: 1350px;
+  max-width: 900px;
   margin: auto;
   padding-top: 1.5rem;
 }
 
-#component-8 {
+#component-13 {
   max-height: fit-content !important;
-  /* height: 800px !important; */
-  width: 650px !important;
+  height: 550px !important;
+  /* width: 650px !important; */
 }
-
-#component-19 {
-  max-height: fit-content !important;
-  /* height: 800px !important; */
-  width: 650px !important;
-}
-
-

@@ -28,13 +28,13 @@ elastic_search:
 
 encoder:
   encoder_name_or_path: 'bkai-foundation-models/vietnamese-bi-encoder'
-  vncorenlp_api: 
+  segment_api: 
     host: 'http://192.168.32.1:9091/segment2'
     input_field: text
     output_field: sent
 
 rerank_model:
-  model_name_or_path: 'kien-vu-uet/finetuned-bert-multilingual-passage-reranking-msmarco'
+  model_name_or_path: 'dangvantuan/CrossEncoder-camembert-large'
   max_length: 512
   batch_size: 8
   num_workers: 0

@@ -1,0 +1,67 @@
+
+seed: 42
+
+datasets:
+  Advise-data:
+    data_path: "./data/no_segmentqa-advise-source.json"
+    train_path: "./data/train_test_split/qa-advise-source-train.json"
+    test_path: "./data/train_test_split/qa-advise-source-test.json"
+    data_module: "BasicNLIDataset"
+    test_size: 0.15
+    reverse_input: false
+    force_remake: false
+
+tokenizer: "kien-vu-uet/vibert-base-crossencoder-finetuned"
+hf_cache: "../hf_cache"
+max_length: 512
+
+pretrained_path: './model_checkpoints/vibert-base/vibert-base-finetuned.pt'
+load_state_dict_option: 'force_load'
+model:
+  model_type: "Bert"
+  hidden_size: 768
+  num_hidden_layers: 12
+  num_attention_heads: 12
+  intermediate_size: 3072
+  hidden_act: "gelu"
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 512
+  position_embedding_type: "absolute"
+  output_past: true
+  torch_dtype: "float32"
+  type_vocab_size: 2
+  layer_norm_eps: 0.000000000001
+  initializer_range: 0.02
+  pooler_fc_size: 768
+  pooler_num_attention_heads: 12
+  pooler_num_fc_layers: 3
+  pooler_size_per_head: 128
+  pooler_type: "first_token_transform"
+  classifier_dropout: null
+  num_labels: 2
+  id2label:
+    0: irrelevant
+    1: relevant
+  use_cache: true
+  problem_type: single_label_classification
+
+max_epochs: 100
+batch_size: 128
+
+input_fields:
+- input_ids
+- attention_mask
+- token_type_ids
+# - position_ids
+- labels
+
+shuffle_train: true
+shuffle_test: false
+num_workers: 1
+device: 0
+optimizer: "AdamW"
+lr: 0.00005
+model_checkpoints: "./model_checkpoints/vibert-base-finetune/"
+train_from_last_epoch: true
+

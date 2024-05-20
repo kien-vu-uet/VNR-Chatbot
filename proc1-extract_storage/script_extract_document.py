@@ -597,7 +597,7 @@ import multiprocessing as mpc
 
 # %%
 def get_curr_timestamp() -> str:
-    current_time = current_time = datetime.now()
+    current_time = datetime.now()
     return current_time.strftime("%y/%m/%d %H:%M:%S")
 
 def clean_data(text:str) -> str:
@@ -780,6 +780,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.out_dir):
         os.mkdir(args.out_dir)
     
+    
     ignore_symbol_numbers = []
     if args.checkpoint_dir is not None and os.path.exists(args.checkpoint_dir):
         ckpt_path = get_ckpt_file_path(args.checkpoint_dir)
@@ -789,8 +790,8 @@ if __name__ == "__main__":
                 try:
                     item = json.loads(line)
                     ignore_symbol_numbers.append(item["symbol_number"])
-                except:
-                    pass
+                except Exception as e:
+                    print("Error when verify checkpoints! Got", e.args)
         ignore_symbol_numbers = list(set(ignore_symbol_numbers))
 
     

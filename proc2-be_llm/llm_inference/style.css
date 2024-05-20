@@ -15,3 +15,10 @@ h1 {
   margin: auto;
   padding-top: 1.5rem;
 }
+
+#component-9 {
+  max-height: fit-content !important;
+  height: 500px !important;
+  /* width: 650px !important; */
+}
+
