@@ -73,13 +73,16 @@ class KNeighborsExpansion(BaseExpansion):
                 "should": []
             }
         }    
-        for symbol_number, chunk_indexs in expand_index_mapping.items():
+        expand_outputs = []
+        for symbol_number, chunk_indexs in tqdm(expand_index_mapping.items()):
             query_item = [
                 {"match_phrase": {"symbol_number": symbol_number}},
                 {"terms": {"chunk_index": chunk_indexs}},
             ]
             if self.same_header:
                 query_item.append({"match_phrase": {"header": header_mapping[symbol_number]}})
+                
+            print(query_item)
             
             expand_query['bool']['should'].append(
                 {
@@ -94,23 +97,47 @@ class KNeighborsExpansion(BaseExpansion):
                 }
             )
             
-        response = self.es_executor.client.search(
+            if expand_query['bool']['should'].__len__() > 5:
+                response = self.es_executor.client.search(
                                                 index=self.es_executor.index,
                                                 query=expand_query,
                                                 explain=True)
+                
+                for item in tqdm(response['hits']['hits'], desc='Rescore'):
+                    bm25_score = 0
+                    knn_score = 0
+                    if item['_explanation']['details'][0]['details'][-1]['description'].startswith('min of:'):
+                        bm25_score = item['_explanation']['details'][0]['details'][-1]['value']
+                    elif item['_explanation']['details'][0]['details'][-1]['description'].startswith('within top'):
+                        bm25_score = item['_explanation']['details'][0]['details'][-2]['value']
+                        knn_score = item['_explanation']['details'][0]['details'][-1]['value']
+                    item['_score'] = [bm25_score, self.es_executor._normalized_cosine(knn_score)]
+                    item.pop('_explanation')
+                    expand_outputs.append(item)
+                    
+                expand_query['bool']['should'].clear()
+                
+            
+        if expand_query['bool']['should'].__len__() > 0:
+            response = self.es_executor.client.search(
+                                                    index=self.es_executor.index,
+                                                    query=expand_query,
+                                                    explain=True)
         
-        expand_outputs = []
-        for item in tqdm(response['hits']['hits'], desc='Rescore'):
-            bm25_score = 0
-            knn_score = 0
-            if item['_explanation']['details'][0]['details'][-1]['description'].startswith('min of:'):
-                bm25_score = item['_explanation']['details'][0]['details'][-1]['value']
-            elif item['_explanation']['details'][0]['details'][-1]['description'].startswith('within top'):
-                bm25_score = item['_explanation']['details'][0]['details'][-2]['value']
-                knn_score = item['_explanation']['details'][0]['details'][-1]['value']
-            item['_score'] = [bm25_score, self.es_executor._normalized_cosine(knn_score)]
-            item.pop('_explanation')
-            expand_outputs.append(item)
+        
+            for item in tqdm(response['hits']['hits'], desc='Rescore'):
+                bm25_score = 0
+                knn_score = 0
+                if item['_explanation']['details'][0]['details'][-1]['description'].startswith('min of:'):
+                    bm25_score = item['_explanation']['details'][0]['details'][-1]['value']
+                elif item['_explanation']['details'][0]['details'][-1]['description'].startswith('within top'):
+                    bm25_score = item['_explanation']['details'][0]['details'][-2]['value']
+                    knn_score = item['_explanation']['details'][0]['details'][-1]['value']
+                item['_score'] = [bm25_score, self.es_executor._normalized_cosine(knn_score)]
+                item.pop('_explanation')
+                expand_outputs.append(item)
+                
+            expand_query['bool']['should'].clear()
 
         # expand_outputs.extend(pool)   
         return expand_outputs

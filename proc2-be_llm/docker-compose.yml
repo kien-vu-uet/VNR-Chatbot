@@ -67,7 +67,7 @@ services:
   #     retries: 3
   #     start_period: 60s
 
-  llama-cpp-platform:
+  llm-cpp-platform:
     image: llama-cpp-full:cuda
     container_name: llm-inference-platform-cuda
     command: --server -m ${MODEL_PATH} -c 4096 -fa --host 0.0.0.0 --port 8080 --n-gpu-layers 291 --api-key ${LLM_SERVER_API_KEY}
@@ -113,16 +113,17 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - LLM_SERVER_API_KEY=${LLM_SERVER_API_KEY}
       - LOGIT_BIAS=${LOGIT_BIAS}
+      - SYSTEM_PROMPT=${SYSTEM_PROMPT}
     networks:
       - scada
     restart: unless-stopped
-    depends_on:
-      backend-api:
-        condition: service_healthy
-      # llm_inference:
-      #   condition: service_healthy
-      llama-cpp-platform:
-        condition: service_healthy
+    # depends_on:
+    #   backend-api:
+    #     condition: service_healthy
+    #   llm_inference:
+    #     condition: service_healthy
+    #   llm-cpp-platform:
+    #     condition: service_healthy
 
   # corrector-api:
   #   image: vietnamese-corrector:2.0

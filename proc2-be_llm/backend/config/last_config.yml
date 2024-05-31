@@ -1,9 +1,9 @@
 expand_pool:
-  name: D2QE
-  expand_first: true
+  name: kNE
+  expand_first: false
   params:
     same_header: false
-    num_steps: 1
+    num_steps: 2
     model_name_or_path: kien-vu-uet/doc2query-msmarco-vietnamese-mt5-base-v1-finetuned
     llm_api: http://llm-inference-platform-cuda:8080/completion
     generate_kwargs:
@@ -20,11 +20,11 @@ encoder:
   segment_api:
     output_field: sent
     input_field: text
-    host: http://192.168.16.4:9091/pyvi
-  encoder_name_or_path: minhquy1624/NLI_xnli2_STS
+    host: http://tokenizer-server:9091/pyvi
+  encoder_name_or_path: kien-vu-uet/SimCSE-finetuned-trquad
 elastic_search:
   knn_num_candidates: 100
-  knn_topk: 50
+  knn_topk: 20
   scale: 1
   offset: 0.5
   activate_fn: sigmoid

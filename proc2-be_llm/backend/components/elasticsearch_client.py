@@ -125,13 +125,31 @@ class ElasticSearchExecutor:
                 "query": {
                     "bool": {
                         self.query_type: [
-                            {"match": {"content": question}},
-                            {"match": {"header": question}},
-                            {"match": {"description": question}},
-                            {"match": {"title": question}},
-                            {"match": {"field": question}},
-                            {"match": {"header_segment": question_segment}},
-                            {"match": {"content_segment": question_segment}},
+                            {
+                                "multi_match": {
+                                    "query": question,
+                                    "fields": [
+                                        "content",
+                                        "header",
+                                        "description",
+                                        "title",
+                                        "field",
+                                    ],
+                                    "operator": "or",
+                                    "type": "most_fields"
+                                }
+                            },
+                            {
+                                "multi_match": {
+                                    "query": question_segment,
+                                    "fields": [
+                                        "header_segment",
+                                        "content_segment"
+                                    ],
+                                    "operator": "or",
+                                    "type": "most_fields"
+                                }
+                            }
                         ]
                     }
                 },

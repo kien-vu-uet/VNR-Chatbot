@@ -5,6 +5,24 @@ from transformers import AutoTokenizer
 
 import gradio as gr
 from gradio_client import Client
+import time
+
+while True:
+    try:
+        if requests.get('http://rag-backend-server:5004/', timeout=3).status_code // 100 == 2:
+            pass
+        else:
+            raise Exception('Waiting for service host=\"backend-api\" starts!')
+        
+        if requests.get('http://llm-inference-platform-cuda:8080/health', timeout=3).status_code // 100 == 2:
+            break
+        else:
+            raise Exception('Waiting for service host=\"llm-cpp-platform\" starts!')
+    except Exception as e:
+        host = re.search(r"host='([^']+)'", str(e.args)).group(1)
+        print(f'Waiting for service {host} starts!')
+    time.sleep(10)
+        
 
 username = os.getenv('USERNAME')
 password = os.getenv('PASSWORD')
@@ -18,10 +36,7 @@ tokenizer.use_default_system_prompt = False
 MAX_NEW_TOKENS = 4096
 DEFAULT_MAX_NEW_TOKENS = 1024
 MAX_INPUT_TOKEN_LENGTH = int(os.getenv("MAX_INPUT_TOKEN_LENGTH", "2048"))
-SYS_PROMPT = "Bạn là một trợ lý tư vấn pháp lý về các vấn đề Luật và Quy chuẩn - Tiêu chuẩn. "\
-             "Hãy suy luận để phản hồi các yêu cầu của người dùng dựa trên tài liệu hoặc thông tin được cung cấp (nếu có). " \
-             "Nếu một câu hỏi không có ý nghĩa hoặc không hợp lý về mặt thông tin, hãy giải thích tại sao thay vì trả lời một điều gì đó không chính xác. " \
-             "Nếu bạn không biết câu trả lời cho một câu hỏi hoặc không tìm thấy thông tin liên quan, hãy trả lời là bạn không biết và vui lòng không chia sẻ thông tin sai lệch."
+SYS_PROMPT = os.getenv('SYSTEM_PROMPT')
              
 def prompt_format(system_prompt, instruction):
     prompt = f"""{system_prompt}
@@ -45,9 +60,10 @@ def generate(
     conversation = []
     if system_prompt:
         conversation.append({"role": "system", "content": system_prompt})
+        os.environ['SYSTEM_PROMPT'] = system_prompt
     ra_outputs = RA_client.predict(query=message, expand_query=True, api_name="/search")
     context = "\n\n".join([item['_doc'] for item in ra_outputs])
-    query = "Bạn hãy trả lời câu hỏi dựa vào thông tin sau:\n" + context + "\nCâu hỏi:" + message
+    query = "Bạn hãy trả lời câu hỏi dựa vào thông tin sau:\n" + context + "\nQUESTION:" + message
     conversation.append({"role": "user", "content": query})
     prompt = tokenizer.apply_chat_template(conversation, tokenize=False) \
                         .replace(tokenizer.bos_token, '') \
@@ -135,9 +151,9 @@ chat_interface = gr.ChatInterface(
         ),
     ],
     examples=[
-        ["Nguyên tắc trong giao thông đường sắt là gì?"],
+        ["Nguyên tắc cơ bản trong giao thông đường sắt là gì?"],
         ["Quy định mới nhất về đăng kiểm phương tiện đường thuỷ nội địa?"],
-        ["Quy trình đăng ký xe cơ giới"],
+        ["Quy trình đăng ký xe cơ giới?"],
     ],
     submit_btn=gr.Button("💬 Gửi"),
     retry_btn=gr.Button("🔄 Thử lại"),
